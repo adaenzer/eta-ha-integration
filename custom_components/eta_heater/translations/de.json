@@ -48,12 +48,23 @@
           "device": "Möglichst einen /dev/serial/by-id/-Pfad verwenden, er ändert sich beim Umstecken nicht.",
           "baudrate": "Die Heizung verwendet 19200 Baud, 8 Datenbits, keine Parität, 1 Stoppbit."
         }
+      },
+      "levels": {
+        "title": "Ebenen der Monitorliste",
+        "description": "Ebenen der Monitorliste der Heizung wählen. Nach diesem Schritt wird die Liste einmal von der Heizung gelesen, das kann besonders über Zigbee einige Minuten dauern. Werte tieferer Ebenen werden deaktiviert angelegt und können einzeln aktiviert werden.",
+        "data": {
+          "levels": "Ebenen der Monitorliste"
+        },
+        "data_description": {
+          "levels": "Ebenen 0 bis 3. Tiefere Ebenen liefern mehr Werte."
+        }
       }
     },
     "error": {
       "cannot_connect": "Verbindung fehlgeschlagen",
       "mqtt_not_available": "Die MQTT-Integration ist nicht eingerichtet. Zuerst einrichten oder einen externen Broker verwenden.",
-      "no_response": "Verbunden, aber die Heizung antwortet nicht."
+      "no_response": "Verbunden, aber die Heizung antwortet nicht.",
+      "invalid_levels": "Mindestens eine Ebene auswählen."
     },
     "abort": {
       "already_configured": "Diese Verbindung ist bereits eingerichtet",
@@ -69,7 +80,7 @@
           "publish_errors": "Störmeldungen über MQTT senden"
         },
         "data_description": {
-          "levels": "Ebenen 0 bis 3 der Monitorliste der Heizung. Tiefere Ebenen liefern mehr Werte; deren Entitäten werden deaktiviert angelegt und können einzeln aktiviert werden. Eine Änderung liest die Liste neu von der Heizung, das dauert einige Minuten.",
+          "levels": "Ebenen 0 bis 3 der Monitorliste der Heizung. Eine Änderung wirkt erst, wenn am Gerät Monitorliste neu einlesen gedrückt wird, da das Einlesen einige Minuten dauert.",
           "scan_interval": "Wie oft die aktivierten Werte von der Heizung gelesen werden. Der Diagnosesensor Lesedauer zeigt, wie lange ein Lesevorgang dauert; nicht benötigte Entitäten zu deaktivieren verkürzt ihn.",
           "publish_errors": "Störmeldungen zusätzlich als JSON an <Topic>/error senden, wie die bisherige AppDaemon-App."
         }
@@ -135,6 +146,15 @@
     },
     "no_values": {
       "message": "Die Heizung hat keine Werte gesendet"
+    },
+    "reread_in_progress": {
+      "message": "Die Monitorliste wird bereits eingelesen"
+    }
+  },
+  "issues": {
+    "levels_changed": {
+      "title": "Ebenen der Monitorliste geändert für {title}",
+      "description": "Die Ebenen wurden auf {levels} geändert, die verwendeten Werte stammen aber aus den Ebenen {list_levels}. Am Gerät **Monitorliste neu einlesen** drücken, um die Liste mit den neuen Ebenen zu lesen. Das dauert einige Minuten; die aktuellen Werte bleiben so lange verfügbar."
     }
   }
 }

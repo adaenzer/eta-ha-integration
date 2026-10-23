@@ -42,6 +42,15 @@ from .fake_heater import TOPIC, FakeHeater
 pytestmark = pytest.mark.usefixtures("transports")
 
 
+async def _finish_levels(hass: HomeAssistant, result: dict) -> dict:
+    """Complete the levels step that follows a successful connection test."""
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "levels"
+    return await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_LEVELS: ["1", "0"]}
+    )
+
+
 async def _start(hass: HomeAssistant, step: str) -> str:
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_USER}
@@ -62,7 +71,9 @@ async def test_ptvo_home_assistant_broker(hass: HomeAssistant) -> None:
     result = await hass.config_entries.flow.async_configure(
         flow_id, {CONF_TOPIC: f" {TOPIC}/ ", CONF_BROKER: BROKER_HOME_ASSISTANT}
     )
+    result = await _finish_levels(hass, result)
     assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["options"] == {CONF_LEVELS: [0, 1]}
     assert result["title"] == f"ETA heater ({TOPIC})"
     assert result["data"] == PTVO_DATA
 
@@ -83,6 +94,7 @@ async def test_ptvo_external_broker(hass: HomeAssistant) -> None:
             CONF_PASSWORD: "pw",
         },
     )
+    result = await _finish_levels(hass, result)
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"] == {
         CONF_CONNECTION: CONNECTION_PTVO_MQTT,
@@ -105,6 +117,7 @@ async def test_serial(hass: HomeAssistant) -> None:
         result = await hass.config_entries.flow.async_configure(
             flow_id, {CONF_DEVICE: SERIAL_DATA[CONF_DEVICE], CONF_BAUDRATE: 19200}
         )
+    result = await _finish_levels(hass, result)
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"] == SERIAL_DATA
 
@@ -138,6 +151,7 @@ async def test_errors_and_recovery(
 
     heater.respond = True
     result = await hass.config_entries.flow.async_configure(flow_id, user_input)
+    result = await _finish_levels(hass, result)
     assert result["type"] is FlowResultType.CREATE_ENTRY
 
 
@@ -241,3 +255,13 @@ async def test_list_serial_ports(hass: HomeAssistant, tmp_path) -> None:
 
     with patch("serialx.async_list_serial_ports", side_effect=OSError):
         assert await _async_list_serial_ports(hass) == []
+
+
+async def test_levels_required(hass: HomeAssistant) -> None:
+    """At least one level must be selected."""
+    flow_id = await _start(hass, CONNECTION_PTVO_MQTT)
+    result = await hass.config_entries.flow.async_configure(
+        flow_id, {CONF_TOPIC: TOPIC, CONF_BROKER: BROKER_HOME_ASSISTANT}
+    )
+    result = await hass.config_entries.flow.async_configure(flow_id, {CONF_LEVELS: []})
+    assert result["errors"] == {CONF_LEVELS: "invalid_levels"}

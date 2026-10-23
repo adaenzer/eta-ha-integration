@@ -5,8 +5,10 @@ from __future__ import annotations
 from homeassistant.components.button import ButtonEntity
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
+from .const import DOMAIN
 from .coordinator import EtaConfigEntry
 from .entity import device_info
 
@@ -23,7 +25,7 @@ async def async_setup_entry(
 
 
 class EtaRereadMonitorListButton(ButtonEntity):
-    """Forget the cached monitor list and read it from the heater again."""
+    """Read the monitor list of the configured levels from the heater again."""
 
     _attr_has_entity_name = True
     _attr_translation_key = "reread_monitor_list"
@@ -37,6 +39,15 @@ class EtaRereadMonitorListButton(ButtonEntity):
         self._attr_device_info = device_info(entry)
 
     async def async_press(self) -> None:
-        """Clear the cached list and reload the entry."""
-        await self._entry.runtime_data.async_clear_monitor_list()
-        self.hass.config_entries.async_schedule_reload(self._entry.entry_id)
+        """Start reading; this takes minutes, so it runs in the background."""
+        coordinator = self._entry.runtime_data
+        if coordinator.rereading:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="reread_in_progress"
+            )
+        coordinator.rereading = True
+        self._entry.async_create_background_task(
+            self.hass,
+            coordinator.async_reread_monitor_list(),
+            "eta_heater_reread_monitor_list",
+        )

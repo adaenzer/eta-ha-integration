@@ -70,12 +70,14 @@ and choose the connection.
 | Baud rate | 19200 for ETA heaters. |
 
 Before the entry is created, the integration checks that the heater answers.
+Then you choose the monitor list levels (0–3). Only after that step is the
+monitor list read from the heater, once.
 
 ### Options
 
 | Option | Default | Description |
 |---|---|---|
-| Monitor list levels | `0` | Levels 0–3 of the monitor list. Deeper levels add more values. Changing them reads the list again. |
+| Monitor list levels | `0` | Levels 0–3 of the monitor list. Deeper levels add more values. A change takes effect when you press *Read monitor list again*. |
 | Update interval | 300 s | How often the enabled values are read. |
 | Publish errors to MQTT | on | PTVO only: also publish errors to `<topic>/error`. |
 
@@ -83,9 +85,12 @@ Connection settings can be changed later with **Reconfigure**.
 
 ## How data is updated
 
-On the first start, the integration reads the monitor list of the configured
-levels from the heater. This can take a few minutes over Zigbee. The list is
-cached and only read again when the levels change or the button is pressed.
+Right after setup, the integration reads the monitor list of the selected
+levels from the heater. This can take several minutes over Zigbee. The list is
+cached and only read again when you press **Read monitor list again** on the
+device. Changing the levels in the options does not read the list; a repair
+notice reminds you to press the button. While the list is read, the current
+values stay available; if reading fails, the previous list is kept.
 
 Values are polled at the update interval: the integration subscribes to a
 group of values, waits for the heater to send them, unsubscribes and continues

@@ -87,6 +87,24 @@ def _ptvo_schema(defaults: Mapping[str, Any]) -> vol.Schema:
     )
 
 
+def _levels_schema(levels: list[int]) -> dict[Any, Any]:
+    return {
+        vol.Required(CONF_LEVELS, default=[str(level) for level in levels]): (
+            SelectSelector(
+                SelectSelectorConfig(
+                    options=AVAILABLE_LEVELS,
+                    multiple=True,
+                    mode=SelectSelectorMode.LIST,
+                )
+            )
+        )
+    }
+
+
+def _parse_levels(user_input: dict[str, Any]) -> list[int]:
+    return sorted({int(level) for level in user_input[CONF_LEVELS]})
+
+
 def _broker_schema(defaults: Mapping[str, Any]) -> vol.Schema:
     return vol.Schema(
         {
@@ -280,15 +298,33 @@ class EtaConfigFlow(ConfigFlow, domain=DOMAIN):
         return {}
 
     async def _async_finish(self) -> ConfigFlowResult:
-        if self._data[CONF_CONNECTION] == CONNECTION_SERIAL:
-            title = f"ETA heater ({self._data[CONF_DEVICE]})"
-        else:
-            title = f"ETA heater ({self._data[CONF_TOPIC]})"
         if self.source == "reconfigure":
             return self.async_update_reload_and_abort(
-                self._get_reconfigure_entry(), title=title, data=self._data
+                self._get_reconfigure_entry(), title=self._title(), data=self._data
             )
-        return self.async_create_entry(title=title, data=self._data)
+        return await self.async_step_levels()
+
+    async def async_step_levels(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Choose the monitor list levels; the list is read after this step."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            if levels := _parse_levels(user_input):
+                return self.async_create_entry(
+                    title=self._title(), data=self._data, options={CONF_LEVELS: levels}
+                )
+            errors[CONF_LEVELS] = "invalid_levels"
+        return self.async_show_form(
+            step_id="levels",
+            data_schema=vol.Schema(_levels_schema(DEFAULT_LEVELS)),
+            errors=errors,
+        )
+
+    def _title(self) -> str:
+        if self._data[CONF_CONNECTION] == CONNECTION_SERIAL:
+            return f"ETA heater ({self._data[CONF_DEVICE]})"
+        return f"ETA heater ({self._data[CONF_TOPIC]})"
 
 
 class EtaOptionsFlow(OptionsFlowWithReload):
@@ -300,23 +336,13 @@ class EtaOptionsFlow(OptionsFlowWithReload):
         """Manage the options."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            levels = sorted({int(level) for level in user_input[CONF_LEVELS]})
-            if levels:
+            if levels := _parse_levels(user_input):
                 return self.async_create_entry(data={**user_input, CONF_LEVELS: levels})
             errors[CONF_LEVELS] = "invalid_levels"
 
         options = self.config_entry.options
         schema: dict[Any, Any] = {
-            vol.Required(
-                CONF_LEVELS,
-                default=[str(lvl) for lvl in options.get(CONF_LEVELS, DEFAULT_LEVELS)],
-            ): SelectSelector(
-                SelectSelectorConfig(
-                    options=AVAILABLE_LEVELS,
-                    multiple=True,
-                    mode=SelectSelectorMode.LIST,
-                )
-            ),
+            **_levels_schema(options.get(CONF_LEVELS, DEFAULT_LEVELS)),
             vol.Required(
                 CONF_SCAN_INTERVAL,
                 default=options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),

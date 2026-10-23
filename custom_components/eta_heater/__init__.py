@@ -9,6 +9,7 @@ import logging
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers import issue_registry as ir
 import homeassistant.util.dt as dt_util
 
 from .client import EtaClient
@@ -21,7 +22,12 @@ from .const import (
     DOMAIN,
     ERROR_TOPIC_SUFFIX,
 )
-from .coordinator import EtaConfigEntry, EtaCoordinator, monitor_list_store
+from .coordinator import (
+    EtaConfigEntry,
+    EtaCoordinator,
+    levels_issue_id,
+    monitor_list_store,
+)
 from .protocol import Frame
 from .transport import PtvoMqttTransport, TransportError
 
@@ -102,3 +108,4 @@ async def async_unload_entry(hass: HomeAssistant, entry: EtaConfigEntry) -> bool
 async def async_remove_entry(hass: HomeAssistant, entry: EtaConfigEntry) -> None:
     """Remove the cached monitor list when the entry is deleted."""
     await monitor_list_store(hass, entry.entry_id).async_remove()
+    ir.async_delete_issue(hass, DOMAIN, levels_issue_id(entry.entry_id))

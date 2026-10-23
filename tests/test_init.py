@@ -9,7 +9,8 @@ from homeassistant.components.button import DOMAIN as BUTTON_DOMAIN, SERVICE_PRE
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import ATTR_ENTITY_ID, STATE_OFF, STATE_ON, STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import entity_registry as er
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import entity_registry as er, issue_registry as ir
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -89,7 +90,7 @@ async def test_values_update(
 async def test_monitor_list_cached(
     hass: HomeAssistant, heater: FakeHeater, serial_entry: MockConfigEntry
 ) -> None:
-    """The monitor list is read once and again only when levels change."""
+    """The list is read on the first setup only; level changes need the button."""
     await _setup(hass, serial_entry)
     requests = len(heater.requests_of("MA"))
     assert requests == len(heater.monitor_list[0]) + 1
@@ -98,31 +99,86 @@ async def test_monitor_list_cached(
     await hass.async_block_till_done()
     assert len(heater.requests_of("MA")) == requests
 
+    issues = ir.async_get(hass)
+    issue_id = f"levels_changed_{serial_entry.entry_id}"
     hass.config_entries.async_update_entry(serial_entry, options={CONF_LEVELS: [0, 1]})
     await hass.config_entries.async_reload(serial_entry.entry_id)
     await hass.async_block_till_done()
+    assert len(heater.requests_of("MA")) == requests
+    assert issues.async_get_issue(DOMAIN, issue_id)
+
+    await _press_reread(hass, serial_entry)
     assert len(heater.requests_of("MA")) > requests
     assert _entity_id(hass, serial_entry, 9, 300)
+    assert not issues.async_get_issue(DOMAIN, issue_id)
+
+
+async def _press_reread(hass: HomeAssistant, entry: MockConfigEntry) -> None:
+    button = er.async_get(hass).async_get_entity_id(
+        "button", DOMAIN, f"{entry.entry_id}_reread_monitor_list"
+    )
+    await hass.services.async_call(
+        BUTTON_DOMAIN, SERVICE_PRESS, {ATTR_ENTITY_ID: button}, blocking=True
+    )
+    await hass.async_block_till_done(wait_background_tasks=True)
+    await hass.async_block_till_done()
 
 
 async def test_reread_button(
     hass: HomeAssistant, heater: FakeHeater, serial_entry: MockConfigEntry
 ) -> None:
-    """The button reads the monitor list again."""
+    """The button reads the monitor list again and applies it."""
     await _setup(hass, serial_entry)
-    requests = len(heater.requests_of("MA"))
     heater.monitor_list[0].append(((8, 0, 20, 0, 176, 0, 0, 10, 0), "Neu"))
     heater.values[(8, 20)] = 100
+    await _press_reread(hass, serial_entry)
+    assert hass.states.get(_entity_id(hass, serial_entry, 8, 20)).state == "10.0"
 
+
+async def test_reread_failure(
+    hass: HomeAssistant,
+    heater: FakeHeater,
+    serial_entry: MockConfigEntry,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A failed re-read keeps the previous list and its values."""
+    await _setup(hass, serial_entry)
+    temp = _entity_id(hass, serial_entry, 8, 1)
+    heater.respond = False
+    await _press_reread(hass, serial_entry)
+    assert "keeping the previous one" in caplog.text
+    assert serial_entry.state is ConfigEntryState.LOADED
+    assert hass.states.get(temp).state == "65.2"
+    assert not serial_entry.runtime_data.rereading
+
+
+async def test_reread_in_progress(
+    hass: HomeAssistant, heater: FakeHeater, serial_entry: MockConfigEntry
+) -> None:
+    """Pressing the button while reading is refused."""
+    await _setup(hass, serial_entry)
+    serial_entry.runtime_data.rereading = True
     button = er.async_get(hass).async_get_entity_id(
         "button", DOMAIN, f"{serial_entry.entry_id}_reread_monitor_list"
     )
-    await hass.services.async_call(
-        BUTTON_DOMAIN, SERVICE_PRESS, {ATTR_ENTITY_ID: button}, blocking=True
-    )
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(
+            BUTTON_DOMAIN, SERVICE_PRESS, {ATTR_ENTITY_ID: button}, blocking=True
+        )
+
+
+async def test_remove_entry(
+    hass: HomeAssistant, heater: FakeHeater, serial_entry: MockConfigEntry
+) -> None:
+    """Removing the entry removes its repair issue."""
+    await _setup(hass, serial_entry)
+    hass.config_entries.async_update_entry(serial_entry, options={CONF_LEVELS: [1]})
+    await hass.config_entries.async_reload(serial_entry.entry_id)
     await hass.async_block_till_done()
-    assert len(heater.requests_of("MA")) > requests
-    assert hass.states.get(_entity_id(hass, serial_entry, 8, 20)).state == "10.0"
+    issue_id = f"levels_changed_{serial_entry.entry_id}"
+    assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id)
+    await hass.config_entries.async_remove(serial_entry.entry_id)
+    assert not ir.async_get(hass).async_get_issue(DOMAIN, issue_id)
 
 
 async def test_errors(

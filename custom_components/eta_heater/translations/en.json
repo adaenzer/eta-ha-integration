@@ -48,12 +48,23 @@
           "device": "Prefer a /dev/serial/by-id/ path, it does not change when devices are plugged in.",
           "baudrate": "The heater uses 19200 baud, 8 data bits, no parity, 1 stop bit."
         }
+      },
+      "levels": {
+        "title": "Monitor list levels",
+        "description": "Choose the levels of the heater's monitor list. After this step the list is read from the heater once, which can take several minutes, especially over Zigbee. Values of deeper levels are created disabled and can be enabled one by one.",
+        "data": {
+          "levels": "Monitor list levels"
+        },
+        "data_description": {
+          "levels": "Levels 0 to 3. Deeper levels add more values."
+        }
       }
     },
     "error": {
       "cannot_connect": "Failed to connect",
       "mqtt_not_available": "The MQTT integration is not set up. Set it up first or use an external broker.",
-      "no_response": "Connected, but the heater did not answer."
+      "no_response": "Connected, but the heater did not answer.",
+      "invalid_levels": "Select at least one level."
     },
     "abort": {
       "already_configured": "This connection is already configured",
@@ -69,7 +80,7 @@
           "publish_errors": "Publish errors to MQTT"
         },
         "data_description": {
-          "levels": "Levels 0 to 3 of the heater's monitor list. Deeper levels add more values; their entities are created disabled and can be enabled one by one. Changing the levels reads the list from the heater again, which takes a few minutes.",
+          "levels": "Levels 0 to 3 of the heater's monitor list. A change only takes effect when you press Read monitor list again on the device, because reading the list takes several minutes.",
           "scan_interval": "How often the enabled values are read from the heater. The diagnostic sensor Read duration shows how long one read takes; disabling entities you do not need makes it shorter.",
           "publish_errors": "Also publish error messages as JSON to <topic>/error, like the former AppDaemon app."
         }
@@ -135,6 +146,15 @@
     },
     "no_values": {
       "message": "The heater did not send any values"
+    },
+    "reread_in_progress": {
+      "message": "The monitor list is already being read"
+    }
+  },
+  "issues": {
+    "levels_changed": {
+      "title": "Monitor list levels changed for {title}",
+      "description": "The levels were changed to {levels}, but the values in use were read with levels {list_levels}. Press **Read monitor list again** on the device to read the list with the new levels. This takes several minutes; the current values stay available meanwhile."
     }
   }
 }
