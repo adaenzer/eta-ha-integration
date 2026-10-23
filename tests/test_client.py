@@ -135,6 +135,7 @@ async def test_foreign_values_ignored(heater: FakeHeater) -> None:
     heater.foreign_values = True
     client = EtaClient(FakeSerialTransport(heater))
     assert await client.async_read_values([(8, 1), (8, 2)]) == {(8, 1): 652, (8, 2): 3}
+    assert client.foreign_value_frames == 1
 
     heater.answer_values = False
     heater.requests.clear()

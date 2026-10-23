@@ -28,6 +28,7 @@ from .coordinator import (
     levels_issue_id,
     monitor_list_issue_id,
     monitor_list_store,
+    other_program_issue_id,
 )
 from .protocol import Frame
 from .transport import PtvoMqttTransport, TransportError
@@ -111,3 +112,4 @@ async def async_remove_entry(hass: HomeAssistant, entry: EtaConfigEntry) -> None
     await monitor_list_store(hass, entry.entry_id).async_remove()
     ir.async_delete_issue(hass, DOMAIN, levels_issue_id(entry.entry_id))
     ir.async_delete_issue(hass, DOMAIN, monitor_list_issue_id(entry.entry_id))
+    ir.async_delete_issue(hass, DOMAIN, other_program_issue_id(entry.entry_id))

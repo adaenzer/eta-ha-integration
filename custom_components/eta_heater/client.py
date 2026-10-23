@@ -76,6 +76,10 @@ class EtaClient:
         self._waiters: dict[str, asyncio.Future[Frame]] = {}
         self._value_queue: asyncio.Queue[dict[tuple[int, int], int]] | None = None
         self._error_listeners: list[ErrorListener] = []
+        # Values this client ever subscribed to; value frames with none of
+        # them were requested by another program talking to the heater
+        self._requested_keys: set[tuple[int, int]] = set()
+        self.foreign_value_frames = 0
         transport.set_receiver(self._parser.feed)
 
     async def async_connect(self) -> None:
@@ -112,10 +116,12 @@ class EtaClient:
                 listener(frame)
             return
         if frame.service == SERVICE_VALUES:
-            if (
-                self._value_queue is not None
-                and (values := parse_values(frame.payload)) is not None
-            ):
+            if not (values := parse_values(frame.payload)):
+                return
+            if not values.keys() & self._requested_keys:
+                self.foreign_value_frames += 1
+                _LOGGER.debug("Values requested by someone else: %s", sorted(values))
+            if self._value_queue is not None:
                 self._value_queue.put_nowait(values)
             return
         if (waiter := self._waiters.pop(frame.service, None)) and not waiter.done():
@@ -199,6 +205,7 @@ class EtaClient:
             try:
                 for start in range(0, len(keys), group_size):
                     group = keys[start : start + group_size]
+                    self._requested_keys.update(group)
                     try:
                         await self._async_send(
                             subscribe_request(SUBSCRIBE_REFRESH_S, group)

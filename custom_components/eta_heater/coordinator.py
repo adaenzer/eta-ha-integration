@@ -42,6 +42,11 @@ def levels_issue_id(entry_id: str) -> str:
     return f"levels_changed_{entry_id}"
 
 
+def other_program_issue_id(entry_id: str) -> str:
+    """Return the id of the repair issue shown when someone else polls."""
+    return f"other_program_{entry_id}"
+
+
 def monitor_list_issue_id(entry_id: str) -> str:
     """Return the id of the repair issue shown when reading the list failed."""
     return f"monitor_list_failed_{entry_id}"
@@ -82,6 +87,7 @@ class EtaCoordinator(DataUpdateCoordinator[EtaData]):
         self.list_levels: list[int] = []
         self.rereading = False
         self.last_read_duration: float | None = None
+        self._foreign_value_frames = 0
         self._store = monitor_list_store(hass, entry.entry_id)
 
     @property
@@ -137,6 +143,7 @@ class EtaCoordinator(DataUpdateCoordinator[EtaData]):
         try:
             await self._async_read_monitor_list()
         except (EtaError, TransportError) as err:
+            self._async_check_other_program()
             error = str(err) or type(err).__name__
             _LOGGER.error("Reading the monitor list failed: %s", error)
             ir.async_create_issue(
@@ -156,6 +163,32 @@ class EtaCoordinator(DataUpdateCoordinator[EtaData]):
             self.rereading = False
         ir.async_delete_issue(self.hass, DOMAIN, issue_id)
         self.hass.config_entries.async_schedule_reload(self.config_entry.entry_id)
+
+    def _async_check_other_program(self) -> None:
+        """Warn while another program is requesting values from the heater.
+
+        The controller cannot serve two programs, so requests of this
+        integration fail while e.g. a former AppDaemon app is still polling.
+        """
+        issue_id = other_program_issue_id(self.config_entry.entry_id)
+        seen = self.client.foreign_value_frames
+        if seen == self._foreign_value_frames:
+            ir.async_delete_issue(self.hass, DOMAIN, issue_id)
+            return
+        self._foreign_value_frames = seen
+        _LOGGER.warning(
+            "The heater sends values this integration did not request; another "
+            "program is talking to it and disturbs the communication"
+        )
+        ir.async_create_issue(
+            self.hass,
+            DOMAIN,
+            issue_id,
+            is_fixable=False,
+            severity=ir.IssueSeverity.ERROR,
+            translation_key="other_program",
+            translation_placeholders={"title": self.config_entry.title},
+        )
 
     def _async_update_levels_issue(self) -> None:
         """Tell the user to read the list again after changing the levels."""
@@ -220,11 +253,13 @@ class EtaCoordinator(DataUpdateCoordinator[EtaData]):
         try:
             raw = await self.client.async_read_values([e.key for e in selected])
         except (EtaError, TransportError) as err:
+            self._async_check_other_program()
             raise UpdateFailed(
                 translation_domain=DOMAIN,
                 translation_key="update_failed",
                 translation_placeholders={"error": str(err)},
             ) from err
+        self._async_check_other_program()
         data = {e.key: e.scale(raw[e.key]) for e in selected if e.key in raw}
         if not data:
             raise UpdateFailed(translation_domain=DOMAIN, translation_key="no_values")

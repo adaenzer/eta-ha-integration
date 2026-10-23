@@ -217,6 +217,11 @@ something else, the diagnostics download lists every entry with its type.
 - **"Connected, but the heater did not answer"**: check the wiring and baud
   rate, and for PTVO that zigbee2mqtt shows the device and publishes `action`
   messages when the heater sends data.
+- **Repair notice "Another program is talking to …"**: the heater sends
+  values this integration did not request, so another program polls it at the
+  same time, typically the former AppDaemon app. The controller cannot serve
+  both, so reads fail. Stop the other program; in Home Assistant OS, turning
+  off *Start on boot* does not stop a running app.
 - **Entities unavailable**: enable debug logging for
   `custom_components.eta_heater` and check whether `MD` frames arrive.
 - Download diagnostics from the device page to see the monitor list and the

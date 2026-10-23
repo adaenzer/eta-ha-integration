@@ -377,6 +377,15 @@ async def test_only_foreign_values_fail_update(
     assert (
         hass.states.get(_entity_id(hass, serial_entry, 8, 1)).state == STATE_UNAVAILABLE
     )
+    issue_id = f"other_program_{serial_entry.entry_id}"
+    assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id)
+
+    # The notice disappears once the other program stopped
+    heater.foreign_values = False
+    heater.answer_values = True
+    await serial_entry.runtime_data.async_refresh()
+    assert serial_entry.runtime_data.last_update_success
+    assert not ir.async_get(hass).async_get_issue(DOMAIN, issue_id)
 
 
 async def test_names_and_attributes(hass: HomeAssistant, heater: FakeHeater) -> None:

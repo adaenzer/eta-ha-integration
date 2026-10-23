@@ -194,6 +194,10 @@
     "monitor_list_failed": {
       "title": "Monitorliste von {title} konnte nicht gelesen werden",
       "description": "Das Lesen der Monitorliste von der Heizung ist fehlgeschlagen: {error}\n\nVerbindung zur Heizung prüfen und dann am Gerät **Monitorliste neu einlesen** drücken."
+    },
+    "other_program": {
+      "title": "Ein anderes Programm kommuniziert mit {title}",
+      "description": "Die Heizung sendet Werte, die diese Integration nicht angefordert hat. Ein anderes Programm kommuniziert also gleichzeitig mit der Steuerung, z. B. die bisherige AppDaemon-App `eta2hass`. Die Steuerung kann nicht beide bedienen: Anfragen dieser Integration schlagen fehl und das Einlesen der Monitorliste wird nicht fertig.\n\nDas andere Programm beenden. In Home Assistant OS beendet das Ausschalten von *Beim Booten starten* eine laufende App nicht; auf ihrer Seite **Stoppen** wählen und die App in AppDaemons `apps.yaml` deaktivieren (`disable: true`). Dieser Hinweis verschwindet nach dem nächsten Lesevorgang ohne fremde Werte."
     }
   }
 }

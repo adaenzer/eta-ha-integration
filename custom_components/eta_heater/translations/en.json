@@ -194,6 +194,10 @@
     "monitor_list_failed": {
       "title": "Monitor list of {title} could not be read",
       "description": "Reading the monitor list from the heater failed: {error}\n\nCheck the connection to the heater, then press **Read monitor list again** on the device."
+    },
+    "other_program": {
+      "title": "Another program is talking to {title}",
+      "description": "The heater sends values that this integration did not request, so another program is communicating with the controller at the same time, for example the former AppDaemon app `eta2hass`. The controller cannot serve both: requests of this integration fail and reading the monitor list does not complete.\n\nStop the other program. In Home Assistant OS, disabling *Start on boot* does not stop an app that is running; use **Stop** on its page, and disable the app in AppDaemon's `apps.yaml` (`disable: true`). This notice disappears after the next read without foreign values."
     }
   }
 }
