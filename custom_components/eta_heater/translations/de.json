@@ -110,43 +110,6 @@
           }
         }
       }
-    },
-    "sensor": {
-      "boiler_state": {
-        "state": {
-          "off": "Ausgeschaltet",
-          "heating_up": "Heizvers.",
-          "igniting": "Zündet",
-          "heating": "Heizt",
-          "ember_burnout": "Glutabbrand",
-          "ready": "Bereit",
-          "deashing": "Entaschen",
-          "locked": "Gesperrt",
-          "external_heat": "Fremdwärme",
-          "calibrating": "Kalibrieren",
-          "fault": "Störung"
-        }
-      },
-      "drive_state": {
-        "state": {
-          "off": "Aus",
-          "on": "Ein",
-          "fault": "Störung",
-          "emptying": "Leeren",
-          "self_test": "Selbsttest",
-          "reverse": "Retour"
-        }
-      },
-      "hot_water_state": {
-        "state": {
-          "charging": "Laden",
-          "charged": "Geladen",
-          "requesting": "Fordert an",
-          "off_by_timer": "Aus (Uhr)",
-          "solar_priority": "Solarvorrang",
-          "fault": "Störung"
-        }
-      }
     }
   },
   "exceptions": {

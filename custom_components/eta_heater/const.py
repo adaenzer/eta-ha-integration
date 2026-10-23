@@ -53,7 +53,6 @@ class ValueType:
     device_class: SensorDeviceClass | BinarySensorDeviceClass | None = None
     unit: str | None = None
     state_class: SensorStateClass | None = None
-    options: tuple[str, ...] | None = None
     translation_key: str | None = None
 
 
@@ -61,13 +60,10 @@ def _binary(device_class: BinarySensorDeviceClass | None = None) -> ValueType:
     return ValueType(Platform.BINARY_SENSOR, device_class)
 
 
-def _enum(translation_key: str, *options: str) -> ValueType:
-    return ValueType(
-        Platform.SENSOR,
-        SensorDeviceClass.ENUM,
-        options=options,
-        translation_key=translation_key,
-    )
+def _status(translation_key: str) -> ValueType:
+    # The meaning of the numbers is unknown, so the raw value is shown. The
+    # translation key only selects the icon.
+    return ValueType(Platform.SENSOR, translation_key=translation_key)
 
 
 def _measurement(
@@ -94,34 +90,13 @@ VALUE_TYPES: Final[dict[int, ValueType]] = {
     8: _binary(),
     13: _binary(),
     15: _binary(BinarySensorDeviceClass.OPENING),
-    16: _enum(
-        "boiler_state",
-        "off",
-        "heating_up",
-        "igniting",
-        "heating",
-        "ember_burnout",
-        "ready",
-        "deashing",
-        "locked",
-        "external_heat",
-        "calibrating",
-        "fault",
-    ),
+    16: _status("boiler_state"),
     17: _binary(),
-    23: _enum("drive_state", "off", "on", "fault", "emptying", "self_test", "reverse"),
+    23: _status("drive_state"),
     30: _binary(),
     32: ValueType(Platform.SENSOR),
     37: _measurement(PERCENTAGE),
-    45: _enum(
-        "hot_water_state",
-        "charging",
-        "charged",
-        "requesting",
-        "off_by_timer",
-        "solar_priority",
-        "fault",
-    ),
+    45: _status("hot_water_state"),
     48: _hours(),
     65: _measurement(UnitOfElectricCurrent.AMPERE, SensorDeviceClass.CURRENT),
     80: _binary(),

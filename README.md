@@ -14,8 +14,8 @@ All entities belong to one device per heater:
 
 - **Sensors and binary sensors** for every value of the heater's monitor list.
   The names come from the heater. Temperatures, currents, voltages, percentages
-  and operating hours get proper units; boiler, drive and hot water states are
-  shown as translated states.
+  and operating hours get proper units. Status values (boiler, drive, hot water)
+  are shown as raw numbers, see *Known limitations*.
 - **Error event** (`event.<name>_error`) fires whenever the heater sends an
   error message (`IM`, `SE`, `SS`). Its attributes `error_type` and `message`
   hold the type and text.
@@ -92,6 +92,10 @@ with the next group. Values the heater does not send become unavailable.
 ## Known limitations
 
 - Only reading is supported, parameters cannot be changed.
+- The meaning of the status numbers (value types 16, 23 and 45) is unknown.
+  State names such as "Heizt", "Bereit" or "Störung" are known to exist, but
+  not which number belongs to which name, so the raw number is shown. Once the
+  mapping is confirmed on a real heater it can be added as an enum sensor.
 - The value types are known from testing only. Unknown types are shown as plain
   sensors with the raw value; the diagnostics download lists them.
 - Over PTVO, a frame longer than one Zigbee message, or containing the byte

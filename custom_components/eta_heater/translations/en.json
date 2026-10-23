@@ -110,43 +110,6 @@
           }
         }
       }
-    },
-    "sensor": {
-      "boiler_state": {
-        "state": {
-          "off": "Off",
-          "heating_up": "Preheating",
-          "igniting": "Igniting",
-          "heating": "Heating",
-          "ember_burnout": "Ember burnout",
-          "ready": "Ready",
-          "deashing": "De-ashing",
-          "locked": "Locked",
-          "external_heat": "External heat",
-          "calibrating": "Calibrating",
-          "fault": "Fault"
-        }
-      },
-      "drive_state": {
-        "state": {
-          "off": "Off",
-          "on": "On",
-          "fault": "Fault",
-          "emptying": "Emptying",
-          "self_test": "Self test",
-          "reverse": "Reverse"
-        }
-      },
-      "hot_water_state": {
-        "state": {
-          "charging": "Charging",
-          "charged": "Charged",
-          "requesting": "Requesting",
-          "off_by_timer": "Off (timer)",
-          "solar_priority": "Solar priority",
-          "fault": "Fault"
-        }
-      }
     }
   },
   "exceptions": {

@@ -55,7 +55,7 @@ async def test_setup_ptvo(
     assert temp.attributes["unit_of_measurement"] == "°C"
     assert temp.attributes["friendly_name"] == "ETA heater Kesseltemperatur"
     assert state(8, 4).state == "-1.0"
-    assert state(8, 2).state == "heating"
+    assert state(8, 2).state == "3"
     assert state(8, 3).state == STATE_ON
     assert state(8, 5).state == "7"
     assert state(8, 6).attributes["unit_of_measurement"] == "h"
