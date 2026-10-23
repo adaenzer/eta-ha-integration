@@ -44,6 +44,9 @@ MONITOR_LIST_ATTEMPTS = 3
 # After a repeated request was answered, wait this long so that a late answer
 # to the lost request is not taken as the answer to the next one
 LATE_ANSWER_TIME = 2.0
+# How long to wait for a second answer at the start of a level and when the
+# end of a level is reached, see _async_request_entry
+LEVEL_SETTLE_TIME = 1.5
 VALUES_TIMEOUT = 10.0
 # Once the first values of a group arrived, wait this long for the rest
 MORE_VALUES_TIME = 1.0
@@ -167,6 +170,48 @@ class EtaClient:
                 monitor_list_request(0, 0), SERVICE_MONITOR_LIST_ENTRY
             )
 
+    async def _async_request_entry(
+        self, position: int, level: int
+    ) -> MonitorEntry | None:
+        """Request one monitor list entry; None at the end of the list.
+
+        Two quirks of the controller are handled:
+
+        - On the first request of a level it answers "end of list" and sends
+          the actual entry a moment later, so the last answer arriving within
+          LEVEL_SETTLE_TIME is used.
+        - An "end of list" is only accepted when asking again confirms it.
+        """
+        request = monitor_list_request(position, level)
+        frame = await self._async_request(
+            request, SERVICE_MONITOR_LIST_ENTRY, MONITOR_LIST_ATTEMPTS
+        )
+        if position == 0:
+            frame = await self._async_last_answer(SERVICE_MONITOR_LIST_ENTRY, frame)
+        if (entry := parse_monitor_entry(frame.payload, level)) is not None:
+            return entry
+        _LOGGER.debug("End of level %d at position %d, confirming", level, position)
+        frame = await self._async_request(
+            request, SERVICE_MONITOR_LIST_ENTRY, MONITOR_LIST_ATTEMPTS
+        )
+        frame = await self._async_last_answer(SERVICE_MONITOR_LIST_ENTRY, frame)
+        return parse_monitor_entry(frame.payload, level)
+
+    async def _async_last_answer(self, service: str, frame: Frame) -> Frame:
+        """Return the last answer arriving within LEVEL_SETTLE_TIME."""
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + LEVEL_SETTLE_TIME
+        while True:
+            waiter = loop.create_future()
+            self._waiters[service] = waiter
+            try:
+                async with asyncio.timeout_at(deadline):
+                    frame = await waiter
+            except TimeoutError:
+                return frame
+            finally:
+                self._waiters.pop(service, None)
+
     async def async_read_monitor_list(self, levels: list[int]) -> list[MonitorEntry]:
         """Read the monitor list for the given levels, as the heater sends it.
 
@@ -179,13 +224,9 @@ class EtaClient:
             await self._async_send(build_frame(SERVICE_STOP))
             for level in sorted(levels):
                 for position in range(MAX_MONITOR_ENTRIES):
-                    frame = await self._async_request(
-                        monitor_list_request(position, level),
-                        SERVICE_MONITOR_LIST_ENTRY,
-                        MONITOR_LIST_ATTEMPTS,
-                    )
-                    entry = parse_monitor_entry(frame.payload, level)
-                    if entry is None:
+                    if (
+                        entry := await self._async_request_entry(position, level)
+                    ) is None:
                         break
                     entries.append(entry)
             await self._async_send(build_frame(SERVICE_STOP))

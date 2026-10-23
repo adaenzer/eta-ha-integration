@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable, Mapping
+import logging
 from typing import Any
 
 from homeassistant.components import mqtt
@@ -31,6 +33,10 @@ from .transport import (
     Transport,
     TransportError,
 )
+
+_LOGGER = logging.getLogger(__name__)
+
+SUBSCRIBE_TIMEOUT = 10
 
 
 class MqttNotAvailableError(TransportError):
@@ -62,9 +68,21 @@ class HomeAssistantMqttBackend:
             payload = msg.payload
             receiver(payload if isinstance(payload, bytes) else payload.encode())
 
-        return await mqtt.async_subscribe(
-            self.hass, topic, _message_received, encoding=None
+        unsubscribe = await mqtt.async_subscribe(
+            self.hass, topic, _message_received, qos=0, encoding=None
         )
+        # The MQTT integration subscribes in the background; an answer from
+        # the heater that arrives before that would be lost
+        subscribed = asyncio.Event()
+        stop_waiting = mqtt.async_on_subscribe_done(self.hass, topic, 0, subscribed.set)
+        try:
+            async with asyncio.timeout(SUBSCRIBE_TIMEOUT):
+                await subscribed.wait()
+        except TimeoutError:
+            _LOGGER.warning("Subscription to %s not confirmed, continuing", topic)
+        finally:
+            stop_waiting()
+        return unsubscribe
 
     async def async_publish(
         self, topic: str, payload: str, retain: bool = False

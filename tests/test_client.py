@@ -62,7 +62,8 @@ async def test_slow_answers_not_repeated(heater: FakeHeater) -> None:
     client = EtaClient(FakeSerialTransport(heater))
     entries = await client.async_read_monitor_list([0])
     assert len(entries) == len(heater.monitor_list[0])
-    assert len(heater.requests_of("MA")) == len(heater.monitor_list[0]) + 1
+    # one request per entry, the end of the list and its confirmation
+    assert len(heater.requests_of("MA")) == len(heater.monitor_list[0]) + 2
 
 
 async def test_lost_request_repeated_after_timeout(heater: FakeHeater) -> None:
@@ -76,7 +77,7 @@ async def test_lost_request_repeated_after_timeout(heater: FakeHeater) -> None:
         for f, t in zip(heater.requests, heater.request_times, strict=True)
         if f.service == "MA"
     ]
-    assert len(ma) == len(heater.monitor_list[0]) + 2
+    assert len(ma) == len(heater.monitor_list[0]) + 3
     assert ma[1] - ma[0] >= client_module.RESPONSE_TIMEOUT
 
 
@@ -155,3 +156,14 @@ async def test_foreign_values_ignored(heater: FakeHeater) -> None:
     client.transport.max_values_per_request = 4  # type: ignore[misc]
     assert await client.async_read_values(keys) == {}
     assert [f.service for f in heater.requests] == ["MC", "ME"]
+
+
+async def test_level_switch_quirk(heater: FakeHeater) -> None:
+    """A premature "end of list" after a level change does not skip the level."""
+    client = EtaClient(FakeSerialTransport(heater))
+    entries = await client.async_read_monitor_list([0, 1, 2])
+    expected = [n for level in (0, 1, 2) for _, n in heater.monitor_list[level]]
+    assert [e.name for e in entries] == expected
+
+    heater.level_switch_quirk = False
+    assert [e.name for e in await client.async_read_monitor_list([0, 1, 2])] == expected

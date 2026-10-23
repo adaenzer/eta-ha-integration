@@ -48,6 +48,7 @@ def short_timeouts(monkeypatch: pytest.MonkeyPatch) -> None:
         ("FRAME_GAP", 0),
         ("RESPONSE_TIMEOUT", 0.05),
         ("LATE_ANSWER_TIME", 0),
+        ("LEVEL_SETTLE_TIME", 0.03),
         ("VALUES_TIMEOUT", 0.1),
         ("MORE_VALUES_TIME", 0.02),
         ("DISCONNECT_TIMEOUT", 0.5),

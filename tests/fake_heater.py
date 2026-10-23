@@ -97,6 +97,10 @@ class FakeHeater:
         self.respond = True
         self.answer_values = True
         self.foreign_values = False
+        # Like the real controller: the first request of another level is
+        # answered with "end of list" first and the actual entry shortly after
+        self.level_switch_quirk = True
+        self._level: int | None = None
         # Requests to ignore, and delays (seconds) for the next answers
         self.drop = 0
         self.delays: list[float] = []
@@ -136,6 +140,14 @@ class FakeHeater:
             if position < len(entries):
                 header, name = entries[position]
                 payload = bytes(header) + f" {name} ".encode("latin-1")
+            switched = self._level is not None and level != self._level
+            self._level = level
+            if self.level_switch_quirk and switched and payload:
+                loop = asyncio.get_running_loop()
+                delay = self.delays.pop(0) if self.delays else 0
+                loop.call_later(delay, self.output, build_frame("Mb", b""))
+                loop.call_later(delay + 0.01, self.output, build_frame("Mb", payload))
+                return
             self._send(build_frame("Mb", payload))
         elif frame.service == "MC" and self.foreign_values:
             # Answer to a request of another program talking to the heater
