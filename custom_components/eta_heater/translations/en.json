@@ -144,6 +144,9 @@
           },
           "message": {
             "name": "Message"
+          },
+          "raw_message": {
+            "name": "Message as sent"
           }
         }
       }

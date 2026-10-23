@@ -90,7 +90,7 @@ def _publish_errors_to_mqtt(
             {
                 "time": dt_util.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:21],
                 "ErrorType": frame.service,
-                "ErrorText": frame.text,
+                "ErrorText": frame.message,
             }
         )
         entry.async_create_background_task(

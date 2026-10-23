@@ -51,6 +51,23 @@ VALUE_RECORD_LEN = 5
 MAX_REFRESH_SECONDS = 255
 
 
+def clean_display_text(text: str) -> str:
+    """Join the lines of a text formatted for the heater's display.
+
+    The display wraps long words with a hyphen ("Fall-" / "schacht"); such
+    words are joined again, other line breaks become a space.
+    """
+    result = ""
+    for line in (" ".join(line.split()) for line in text.splitlines()):
+        if not line:
+            continue
+        if result.endswith("-") and line[0].islower():
+            result = result[:-1] + line
+        else:
+            result = f"{result} {line}" if result else line
+    return result
+
+
 def checksum(payload: bytes) -> int:
     """Return the frame checksum of a payload."""
     return sum(payload) % 256
@@ -86,6 +103,11 @@ class Frame:
     def text(self) -> str:
         """Return the payload decoded as text."""
         return self.payload.decode(ENCODING).strip()
+
+    @property
+    def message(self) -> str:
+        """Return the text as one line, see clean_display_text."""
+        return clean_display_text(self.text)
 
 
 class FrameParser:

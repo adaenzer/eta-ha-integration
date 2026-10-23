@@ -13,6 +13,7 @@ from custom_components.eta_heater.protocol import (
     MonitorEntry,
     build_frame,
     build_monitor_list,
+    clean_display_text,
     parse_monitor_entry,
     parse_values,
     sms_command_request,
@@ -190,3 +191,14 @@ def test_sms_command_request() -> None:
     """Commands use service IH with the command in the first data byte."""
     # as documented in the Symcon thread for "Kessel Ein"
     assert sms_command_request(0x10) == bytes.fromhex("7B 49 48 02 10 10 00 7D")
+
+
+def test_clean_display_text() -> None:
+    """Display lines are joined, hyphenated words put together again."""
+    text = "** FEHLER ** \nAustragung 0\nWartungsdeckel Fall-\nschacht offen!\n(16:44:12 23.10.26)"
+    assert clean_display_text(text) == (
+        "** FEHLER ** Austragung 0 Wartungsdeckel Fallschacht offen! (16:44:12 23.10.26)"
+    )
+    # a hyphen before an upper case word is kept, e.g. "Pellets-" "Austragung"
+    assert clean_display_text("Pellets-\nAustragung") == "Pellets- Austragung"
+    assert clean_display_text("one line") == "one line"

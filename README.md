@@ -39,7 +39,9 @@ All entities belong to one device per heater:
   heater's menu it is listed under).
 - **Error event** (`event.<name>_error`) fires whenever the heater sends an
   error message (`IM`, `SE`, `SS`). Its attributes `error_type` and `message`
-  hold the type and text.
+  hold the type and the text as one line (the display's line breaks joined,
+  hyphenated words put together again); `raw_message` holds the text exactly
+  as sent.
 - **Read monitor list again** button, for when the heater's configuration
   changed.
 - **Read duration** diagnostic sensor: how long reading all enabled values

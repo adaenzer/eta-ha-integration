@@ -46,6 +46,12 @@ class EtaErrorEvent(EventEntity):
     @callback
     def _handle_error(self, frame: Frame) -> None:
         self._trigger_event(
-            EVENT_TYPE_ERROR, {"error_type": frame.service, "message": frame.text}
+            EVENT_TYPE_ERROR,
+            {
+                "error_type": frame.service,
+                "message": frame.message,
+                # As sent by the heater, with the line breaks of its display
+                "raw_message": frame.text,
+            },
         )
         self.async_write_ha_state()

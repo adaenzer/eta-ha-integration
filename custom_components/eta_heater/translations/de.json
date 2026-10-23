@@ -144,6 +144,9 @@
           },
           "message": {
             "name": "Meldung"
+          },
+          "raw_message": {
+            "name": "Meldung im Original"
           }
         }
       }

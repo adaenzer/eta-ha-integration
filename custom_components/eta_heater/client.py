@@ -119,7 +119,9 @@ class EtaClient:
 
     def _handle_frame(self, frame: Frame) -> None:
         if frame.is_error:
-            _LOGGER.warning("Heater reported error %s: %s", frame.service, frame.text)
+            _LOGGER.warning(
+                "Heater reported error %s: %s", frame.service, frame.message
+            )
             for listener in list(self._error_listeners):
                 listener(frame)
             return
