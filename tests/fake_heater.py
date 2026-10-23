@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 import json
+from time import monotonic
 
 from custom_components.eta_heater.protocol import Frame, FrameParser, build_frame
 from custom_components.eta_heater.transport import Transport, TransportError
@@ -54,7 +55,12 @@ class FakeHeater:
         self.monitor_list = {level: list(e) for level, e in MONITOR_LIST.items()}
         self.values = dict(VALUES)
         self.respond = True
+        self.answer_values = True
+        # Requests to ignore, and delays (seconds) for the next answers
+        self.drop = 0
+        self.delays: list[float] = []
         self.requests: list[Frame] = []
+        self.request_times: list[float] = []
         self.output: Callable[[bytes], None] = lambda data: None
         self._parser = FrameParser(self._handle)
 
@@ -71,11 +77,16 @@ class FakeHeater:
         self.output(build_frame(service, text.encode("latin-1")))
 
     def _send(self, frame: bytes) -> None:
-        asyncio.get_running_loop().call_soon(self.output, frame)
+        delay = self.delays.pop(0) if self.delays else 0
+        asyncio.get_running_loop().call_later(delay, self.output, frame)
 
     def _handle(self, frame: Frame) -> None:
         self.requests.append(frame)
-        if not self.respond:
+        self.request_times.append(monotonic())
+        if not self.respond or frame.service not in ("MA", "MC"):
+            return
+        if self.drop:
+            self.drop -= 1
             return
         if frame.service == "MA":
             position, level = frame.payload
@@ -85,7 +96,7 @@ class FakeHeater:
                 header, name = entries[position]
                 payload = bytes(header) + f" {name} ".encode("latin-1")
             self._send(build_frame("Mb", payload))
-        elif frame.service == "MC":
+        elif frame.service == "MC" and self.answer_values:
             payload = b""
             for pos in range(1, len(frame.payload), 3):
                 node, hb, lb = frame.payload[pos : pos + 3]

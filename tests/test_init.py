@@ -328,3 +328,17 @@ async def test_read_duration(
     state = hass.states.get(entity_id)
     assert float(state.state) >= 0
     assert state.attributes["unit_of_measurement"] == "s"
+
+
+async def test_no_value_reads_during_reread(
+    hass: HomeAssistant, heater: FakeHeater, serial_entry: MockConfigEntry
+) -> None:
+    """Value reads are skipped while the monitor list is read."""
+    await _setup(hass, serial_entry)
+    coordinator = serial_entry.runtime_data
+    temp = _entity_id(hass, serial_entry, 8, 1)
+    heater.requests.clear()
+    coordinator.rereading = True
+    await coordinator.async_refresh()
+    assert not heater.requests
+    assert hass.states.get(temp).state == "65.2"

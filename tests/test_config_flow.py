@@ -5,7 +5,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from homeassistant.config_entries import SOURCE_USER
+from homeassistant.config_entries import SOURCE_USER, ConfigEntryState
 from homeassistant.const import (
     CONF_DEVICE,
     CONF_HOST,
@@ -265,3 +265,36 @@ async def test_levels_required(hass: HomeAssistant) -> None:
     )
     result = await hass.config_entries.flow.async_configure(flow_id, {CONF_LEVELS: []})
     assert result["errors"] == {CONF_LEVELS: "invalid_levels"}
+
+
+async def test_reconfigure_loaded_entry(
+    hass: HomeAssistant, heater: FakeHeater, serial_entry: MockConfigEntry
+) -> None:
+    """A running entry is stopped while probing and restored on failure."""
+    serial_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(serial_entry.entry_id)
+    await hass.async_block_till_done()
+    assert serial_entry.state is ConfigEntryState.LOADED
+
+    with patch(
+        "custom_components.eta_heater.config_flow._async_list_serial_ports",
+        return_value=[],
+    ):
+        result = await serial_entry.start_reconfigure_flow(hass)
+        heater.respond = False
+        heater.requests.clear()
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_DEVICE: "/dev/ttyUSB1", CONF_BAUDRATE: 19200}
+        )
+        assert result["errors"] == {"base": "no_response"}
+        # the entry unsubscribed before the probe and was set up again
+        assert heater.requests[0].service == "ME"
+        assert serial_entry.state is ConfigEntryState.SETUP_RETRY
+
+        heater.respond = True
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_DEVICE: "/dev/ttyUSB1", CONF_BAUDRATE: 19200}
+        )
+    assert result["reason"] == "reconfigure_successful"
+    await hass.async_block_till_done()
+    assert serial_entry.state is ConfigEntryState.LOADED

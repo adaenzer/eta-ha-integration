@@ -191,6 +191,10 @@ class EtaCoordinator(DataUpdateCoordinator[EtaData]):
 
     async def _async_update_data(self) -> EtaData:
         """Read the values of all enabled entities."""
+        if self.rereading:
+            # The monitor list is being read; keep the last values instead of
+            # queueing a value read behind it
+            return self.data
         selected = self.selected_entries()
         if not selected:
             return {}

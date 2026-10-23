@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from homeassistant.config_entries import (
+    ConfigEntryState,
     ConfigFlow,
     ConfigFlowResult,
     OptionsFlowWithReload,
@@ -280,6 +281,18 @@ class EtaConfigFlow(ConfigFlow, domain=DOMAIN):
         ):
             self._async_abort_entries_match(match)
 
+        if self.source != "reconfigure":
+            return await self._async_probe()
+        # The running entry must not talk to the heater (or hold the serial
+        # port) while it is probed; it is set up again afterwards
+        entry = self._get_reconfigure_entry()
+        if entry.state is ConfigEntryState.LOADED:
+            await self.hass.config_entries.async_unload(entry.entry_id)
+        if errors := await self._async_probe():
+            await self.hass.config_entries.async_setup(entry.entry_id)
+        return errors
+
+    async def _async_probe(self) -> dict[str, str]:
         client = EtaClient(create_transport(self.hass, self._data))
         try:
             await client.async_connect()

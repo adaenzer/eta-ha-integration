@@ -38,18 +38,26 @@ SERIAL_DATA = {
 
 
 @pytest.fixture(autouse=True)
-def auto_enable_custom_integrations(enable_custom_integrations: None) -> None:
-    """Enable custom integrations in all tests."""
+def short_timeouts(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make the client give up quickly.
+
+    monkeypatch is set up before Home Assistant, so the values stay patched
+    until Home Assistant is shut down after the test.
+    """
+    for name, value in (
+        ("FRAME_GAP", 0),
+        ("RESPONSE_TIMEOUT", 0.05),
+        ("LATE_ANSWER_TIME", 0),
+        ("VALUES_TIMEOUT", 0.1),
+        ("MORE_VALUES_TIME", 0.02),
+        ("DISCONNECT_TIMEOUT", 0.5),
+    ):
+        monkeypatch.setattr(client_module, name, value)
 
 
 @pytest.fixture(autouse=True)
-def short_timeouts() -> Generator[None]:
-    """Make the client give up quickly."""
-    with (
-        patch.object(client_module, "RESPONSE_TIMEOUT", 0.05),
-        patch.object(client_module, "VALUES_TIMEOUT", 0.1),
-    ):
-        yield
+def auto_enable_custom_integrations(enable_custom_integrations: None) -> None:
+    """Enable custom integrations in all tests."""
 
 
 @pytest.fixture

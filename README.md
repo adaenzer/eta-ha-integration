@@ -96,6 +96,22 @@ Values are polled at the update interval: the integration subscribes to a
 group of values, waits for the heater to send them, unsubscribes and continues
 with the next group. Values the heater does not send become unavailable.
 
+### Communication with the controller
+
+The controller is easily overloaded, so the integration is strict:
+
+- Only one thing talks to the heater at a time. While the monitor list is
+  read, no values are read; the last values stay shown.
+- A new request is only sent after the previous one was answered. A request
+  without an answer counts as lost after 10 seconds; only then is it sent
+  again (monitor list entries, up to three times) or the read is stopped
+  (values: no further groups are requested).
+- At least 0.5 seconds pass between two frames sent to the heater.
+- Every value subscription is stopped again (`ME`), also after errors, and
+  before the monitor list is read.
+- While the connection is reconfigured, the running connection is stopped
+  for the connection test.
+
 ### Choosing which values are read
 
 Only values whose entity is **enabled** are read from the heater. Values of
