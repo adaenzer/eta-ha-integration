@@ -135,12 +135,6 @@
     "mqtt_not_available": {
       "message": "Die MQTT-Integration ist nicht verfügbar"
     },
-    "monitor_list_failed": {
-      "message": "Lesen der Monitorliste fehlgeschlagen: {error}"
-    },
-    "monitor_list_empty": {
-      "message": "Die Heizung hat eine leere Monitorliste geliefert"
-    },
     "update_failed": {
       "message": "Lesen der Werte fehlgeschlagen: {error}"
     },
@@ -155,6 +149,10 @@
     "levels_changed": {
       "title": "Ebenen der Monitorliste geändert für {title}",
       "description": "Die Ebenen wurden auf {levels} geändert, die verwendeten Werte stammen aber aus den Ebenen {list_levels}. Am Gerät **Monitorliste neu einlesen** drücken, um die Liste mit den neuen Ebenen zu lesen. Das dauert einige Minuten; die aktuellen Werte bleiben so lange verfügbar."
+    },
+    "monitor_list_failed": {
+      "title": "Monitorliste von {title} konnte nicht gelesen werden",
+      "description": "Das Lesen der Monitorliste von der Heizung ist fehlgeschlagen: {error}\n\nVerbindung zur Heizung prüfen und dann am Gerät **Monitorliste neu einlesen** drücken."
     }
   }
 }

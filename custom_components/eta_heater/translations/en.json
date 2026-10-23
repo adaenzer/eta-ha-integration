@@ -135,12 +135,6 @@
     "mqtt_not_available": {
       "message": "The MQTT integration is not available"
     },
-    "monitor_list_failed": {
-      "message": "Reading the monitor list from the heater failed: {error}"
-    },
-    "monitor_list_empty": {
-      "message": "The heater returned an empty monitor list"
-    },
     "update_failed": {
       "message": "Reading values from the heater failed: {error}"
     },
@@ -155,6 +149,10 @@
     "levels_changed": {
       "title": "Monitor list levels changed for {title}",
       "description": "The levels were changed to {levels}, but the values in use were read with levels {list_levels}. Press **Read monitor list again** on the device to read the list with the new levels. This takes several minutes; the current values stay available meanwhile."
+    },
+    "monitor_list_failed": {
+      "title": "Monitor list of {title} could not be read",
+      "description": "Reading the monitor list from the heater failed: {error}\n\nCheck the connection to the heater, then press **Read monitor list again** on the device."
     }
   }
 }

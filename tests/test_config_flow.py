@@ -46,9 +46,13 @@ async def _finish_levels(hass: HomeAssistant, result: dict) -> dict:
     """Complete the levels step that follows a successful connection test."""
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "levels"
-    return await hass.config_entries.flow.async_configure(
+    result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {CONF_LEVELS: ["1", "0"]}
     )
+    # Let the monitor list read and the reload finish while the fakes exist
+    await hass.async_block_till_done(wait_background_tasks=True)
+    await hass.async_block_till_done()
+    return result
 
 
 async def _start(hass: HomeAssistant, step: str) -> str:
@@ -273,6 +277,7 @@ async def test_reconfigure_loaded_entry(
     """A running entry is stopped while probing and restored on failure."""
     serial_entry.add_to_hass(hass)
     await hass.config_entries.async_setup(serial_entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
     await hass.async_block_till_done()
     assert serial_entry.state is ConfigEntryState.LOADED
 

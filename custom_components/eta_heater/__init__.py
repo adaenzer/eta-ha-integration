@@ -26,6 +26,7 @@ from .coordinator import (
     EtaConfigEntry,
     EtaCoordinator,
     levels_issue_id,
+    monitor_list_issue_id,
     monitor_list_store,
 )
 from .protocol import Frame
@@ -109,3 +110,4 @@ async def async_remove_entry(hass: HomeAssistant, entry: EtaConfigEntry) -> None
     """Remove the cached monitor list when the entry is deleted."""
     await monitor_list_store(hass, entry.entry_id).async_remove()
     ir.async_delete_issue(hass, DOMAIN, levels_issue_id(entry.entry_id))
+    ir.async_delete_issue(hass, DOMAIN, monitor_list_issue_id(entry.entry_id))

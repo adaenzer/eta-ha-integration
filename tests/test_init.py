@@ -36,8 +36,10 @@ def _entity_id(
 
 
 async def _setup(hass: HomeAssistant, entry: MockConfigEntry) -> None:
+    """Set up the entry and wait for the first monitor list read and reload."""
     entry.add_to_hass(hass)
     await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
     await hass.async_block_till_done()
 
 
@@ -146,7 +148,7 @@ async def test_reread_failure(
     temp = _entity_id(hass, serial_entry, 8, 1)
     heater.respond = False
     await _press_reread(hass, serial_entry)
-    assert "keeping the previous one" in caplog.text
+    assert "Reading the monitor list failed" in caplog.text
     assert serial_entry.state is ConfigEntryState.LOADED
     assert hass.states.get(temp).state == "65.2"
     assert not serial_entry.runtime_data.rereading
@@ -231,13 +233,32 @@ async def test_errors_not_published_when_disabled(
     )
 
 
-async def test_not_ready(
+async def test_first_read_fails(
     hass: HomeAssistant, heater: FakeHeater, serial_entry: MockConfigEntry
 ) -> None:
-    """Setup is retried when the heater cannot be reached."""
+    """A failed first read is reported and can be repeated with the button."""
     heater.respond = False
     await _setup(hass, serial_entry)
-    assert serial_entry.state is ConfigEntryState.SETUP_RETRY
+    assert serial_entry.state is ConfigEntryState.LOADED
+    issue_id = f"monitor_list_failed_{serial_entry.entry_id}"
+    assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id)
+
+    heater.respond = True
+    await _press_reread(hass, serial_entry)
+    assert not ir.async_get(hass).async_get_issue(DOMAIN, issue_id)
+    assert hass.states.get(_entity_id(hass, serial_entry, 8, 1)).state == "65.2"
+
+
+async def test_setup_returns_before_list_is_read(
+    hass: HomeAssistant, heater: FakeHeater, serial_entry: MockConfigEntry
+) -> None:
+    """Setup does not wait for the slow monitor list read."""
+    heater.respond = False
+    serial_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(serial_entry.entry_id)
+    assert serial_entry.state is ConfigEntryState.LOADED
+    assert serial_entry.runtime_data.rereading
+    await hass.async_block_till_done(wait_background_tasks=True)
 
 
 async def test_connect_failure(

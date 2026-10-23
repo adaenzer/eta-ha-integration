@@ -101,7 +101,11 @@ Connection settings can be changed later with **Reconfigure**.
 ## How data is updated
 
 Right after setup, the integration reads the monitor list of the selected
-levels from the heater. This can take several minutes over Zigbee. The list is
+levels from the heater, in the background. This can take several minutes over
+Zigbee; until it is done, the device only shows the button, the error event
+and the read duration sensor. The value entities appear once the list was
+read. If reading fails, a repair notice says so and the button starts a new
+attempt. The list is
 cached and only read again when you press **Read monitor list again** on the
 device. Changing the levels in the options does not read the list; a repair
 notice reminds you to press the button. While the list is read, the current
@@ -175,6 +179,10 @@ of it; adding the heater again reads the monitor list from the heater again.
   `custom_components.eta_heater` and check whether `MD` frames arrive.
 - Download diagnostics from the device page to see the monitor list and the
   last values.
+- To watch the frames exchanged over zigbee2mqtt, run
+  `python tools/monitor_mqtt.py <broker> --user <user>` with this repository's
+  test environment. It asks for the password, only listens and prints every
+  frame decoded.
 
 ## Removal
 
