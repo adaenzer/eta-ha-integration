@@ -15,7 +15,7 @@ This module has no Home Assistant dependencies so it can be tested on its own.
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import logging
 from time import monotonic
 
@@ -162,7 +162,10 @@ def to_signed(value: int) -> int:
 
 @dataclass(frozen=True, slots=True)
 class MonitorEntry:
-    """An entry of the heater's monitor list (a value that can be read)."""
+    """An entry of the heater's monitor list.
+
+    Entries with node 0 are headings of the heater's menu, not values.
+    """
 
     node: int
     index: int
@@ -172,6 +175,17 @@ class MonitorEntry:
     header: tuple[int, ...]
     # Lowest monitor list level the entry was found in
     level: int = 0
+    # Context from the list order, used to tell values with the same name
+    # apart: the heading above the entry, the nearest heading or group start
+    # (e.g. a motor) above it, and the nearest entry above with another name
+    section: str = ""
+    group: str = ""
+    previous: str = ""
+
+    @property
+    def is_heading(self) -> bool:
+        """Return True for a heading of the heater's menu."""
+        return self.node == 0
 
     @property
     def key(self) -> tuple[int, int]:
@@ -187,13 +201,26 @@ class MonitorEntry:
 
     def as_dict(self) -> dict[str, object]:
         """Serialize for storage."""
-        return {"header": list(self.header), "name": self.name, "level": self.level}
+        return {
+            "header": list(self.header),
+            "name": self.name,
+            "level": self.level,
+            "section": self.section,
+            "group": self.group,
+            "previous": self.previous,
+        }
 
     @classmethod
     def from_dict(cls, data: dict[str, object]) -> MonitorEntry:
         """Restore from storage."""
         header = tuple(int(b) for b in data["header"])  # type: ignore[union-attr]
-        return cls.from_header(header, str(data["name"]), int(data.get("level", 0)))  # type: ignore[call-overload]
+        entry = cls.from_header(header, str(data["name"]), int(data.get("level", 0)))  # type: ignore[call-overload]
+        return replace(
+            entry,
+            section=str(data.get("section", "")),
+            group=str(data.get("group", "")),
+            previous=str(data.get("previous", "")),
+        )
 
     @classmethod
     def from_header(
@@ -218,6 +245,36 @@ def parse_monitor_entry(payload: bytes, level: int = 0) -> MonitorEntry | None:
     header = tuple(payload[:MONITOR_ENTRY_HEADER_LEN])
     name = payload[MONITOR_ENTRY_HEADER_LEN:].decode(ENCODING).strip()
     return MonitorEntry.from_header(header, name, level)
+
+
+def build_monitor_list(
+    entries: list[MonitorEntry], is_group_start: Callable[[MonitorEntry], bool]
+) -> list[MonitorEntry]:
+    """Turn the entries as read into the list of values.
+
+    Headings are dropped, each entry gets its context from the entries above
+    it, and a value found several times (also under other names or in other
+    levels) is kept once, as first found.
+    """
+    values: dict[tuple[int, int], MonitorEntry] = {}
+    level = None
+    section = group = previous = ""
+    for entry in entries:
+        if entry.level != level:
+            level = entry.level
+            section = group = previous = ""
+        if entry.is_heading:
+            section = group = entry.name
+            continue
+        values.setdefault(
+            entry.key,
+            replace(entry, section=section, group=group, previous=previous),
+        )
+        if is_group_start(entry):
+            group = entry.name
+        if entry.name != previous:
+            previous = entry.name
+    return list(values.values())
 
 
 def parse_values(payload: bytes) -> dict[tuple[int, int], int] | None:

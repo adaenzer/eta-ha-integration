@@ -23,6 +23,14 @@
       "read_duration": {
         "default": "mdi:timer-outline"
       }
+    },
+    "binary_sensor": {
+      "motor": {
+        "default": "mdi:cog-off",
+        "state": {
+          "on": "mdi:cog"
+        }
+      }
     }
   }
 }

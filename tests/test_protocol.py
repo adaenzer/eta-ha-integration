@@ -9,6 +9,7 @@ from custom_components.eta_heater.protocol import (
     FrameParser,
     MonitorEntry,
     build_frame,
+    build_monitor_list,
     parse_monitor_entry,
     parse_values,
     subscribe_request,
@@ -104,3 +105,38 @@ def test_stale_fragment_dropped() -> None:
     with patch("custom_components.eta_heater.protocol.monotonic", return_value=25.0):
         parser.feed(md)
     assert [f.service for f in frames] == ["MD", "MD"]
+
+
+def test_build_monitor_list() -> None:
+    """Headings are dropped, duplicates merged and context recorded."""
+
+    def entry(node: int, index: int, value_type: int, name: str, level: int = 0):
+        header = (node, index // 256, index % 256, 0, value_type, 0, 0, 1, 0)
+        return MonitorEntry.from_header(header, name, level)
+
+    entries = build_monitor_list(
+        [
+            entry(0, 0, 0, "HACKGUTSTEUERUNG"),
+            entry(40, 22, 5, "STOKERSCHNECKE"),
+            entry(40, 19, 65, "Stoker Strom"),
+            entry(40, 33, 37, "Erwärmung"),
+            entry(40, 23, 5, "AUSTRAGUNG"),
+            entry(40, 34, 37, "Erwärmung"),
+            entry(40, 33, 37, "Erwärmung Stoker", level=1),
+            entry(9, 1, 176, "Vorlauf", level=1),
+        ],
+        lambda e: e.value_type == 5,
+    )
+    by_key = {e.key: e for e in entries}
+    assert list(by_key) == [(40, 22), (40, 19), (40, 33), (40, 23), (40, 34), (9, 1)]
+    assert by_key[(40, 33)].name == "Erwärmung"  # first one found wins
+    assert (by_key[(40, 33)].group, by_key[(40, 34)].group) == (
+        "STOKERSCHNECKE",
+        "AUSTRAGUNG",
+    )
+    assert by_key[(40, 22)].group == "HACKGUTSTEUERUNG"
+    assert by_key[(40, 33)].previous == "Stoker Strom"
+    assert by_key[(40, 33)].section == "HACKGUTSTEUERUNG"
+    # context starts over with each level
+    assert by_key[(9, 1)].section == by_key[(9, 1)].group == ""
+    assert MonitorEntry.from_dict(by_key[(40, 34)].as_dict()) == by_key[(40, 34)]

@@ -377,3 +377,51 @@ async def test_only_foreign_values_fail_update(
     assert (
         hass.states.get(_entity_id(hass, serial_entry, 8, 1)).state == STATE_UNAVAILABLE
     )
+
+
+async def test_names_and_attributes(hass: HomeAssistant, heater: FakeHeater) -> None:
+    """Values sharing a name get a suffix; original data is kept as attributes."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"connection": "serial", "device": "/dev/ttyUSB0", "baudrate": 19200},
+        options={CONF_LEVELS: [2]},
+    )
+    await _setup(hass, entry)
+
+    def state(node: int, index: int):
+        return hass.states.get(_entity_id(hass, entry, node, index))
+
+    names = {
+        key: state(*key).attributes["friendly_name"].removeprefix("ETA heater ")
+        for key in [
+            (40, 33),
+            (40, 34),
+            (40, 23),
+            (40, 29),
+            (24, 54),
+            (24, 58),
+            (24, 63),
+        ]
+    }
+    assert names == {
+        (40, 33): "Erwärmung (STOKERSCHNECKE)",
+        (40, 34): "Erwärmung (AUSTRAGUNG)",
+        (40, 23): "AUSTRAGUNG (motor)",
+        (40, 29): "AUSTRAGUNG (state)",
+        (24, 54): "StellmotSOLL (P-Luftschieber)",
+        (24, 58): "StellmotSOLL (S-Luftschieber)",
+        (24, 63): "kg seit letzter Ent",
+    }
+
+    ash = state(24, 63)
+    assert ash.state == "12.3"
+    assert ash.attributes["unit_of_measurement"] == "kg"
+    assert ash.attributes["state_class"] == "total_increasing"
+    assert ash.attributes["monitor_name"] == "kg seit letzter  Ent"
+    assert ash.attributes["node"] == 24
+    assert ash.attributes["index"] == 63
+    assert ash.attributes["value_type"] == 32
+    assert ash.attributes["divider"] == 10
+    assert ash.attributes["section"] == "BEDIENEINHEIT"
+
+    assert state(40, 19).state == "1.5"  # 1500 mA with divider 1000

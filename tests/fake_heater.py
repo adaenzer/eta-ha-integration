@@ -15,7 +15,17 @@ TOPIC = "zigbee2mqtt/heater"
 
 def entry(node: int, index: int, value_type: int, divider: int = 1) -> tuple[int, ...]:
     """Return monitor list header bytes."""
-    return (node, index // 256, index % 256, 0, value_type, 0, 0, divider, 0)
+    return (
+        node,
+        index // 256,
+        index % 256,
+        0,
+        value_type,
+        0,
+        divider // 256,
+        divider % 256,
+        0,
+    )
 
 
 MONITOR_LIST = {
@@ -32,6 +42,24 @@ MONITOR_LIST = {
         (entry(8, 8, 176, 10), "Puffer unten"),
     ],
     1: [(entry(9, 300, 176, 10), "Vorlauf MK1")],
+    # Structure as found on a real heater: headings, motors starting groups,
+    # values sharing names
+    2: [
+        (entry(0, 0, 0), "HACKGUTSTEUERUNG"),
+        (entry(40, 22, 5), "STOKERSCHNECKE"),
+        (entry(40, 19, 65, 1000), "Stoker Strom"),
+        (entry(40, 33, 37), "Erwärmung"),
+        (entry(40, 23, 5), "AUSTRAGUNG"),
+        (entry(40, 20, 65, 1000), "Austrag. Strom"),
+        (entry(40, 34, 37), "Erwärmung"),
+        (entry(40, 29, 23), "AUSTRAGUNG"),
+        (entry(0, 0, 0), "BEDIENEINHEIT"),
+        (entry(24, 18, 37), "P-Luftschieber"),
+        (entry(24, 54, 37), "StellmotSOLL"),
+        (entry(24, 57, 37), "S-Luftschieber"),
+        (entry(24, 58, 37), "StellmotSOLL"),
+        (entry(24, 63, 32, 10), "kg seit letzter  Ent"),
+    ],
 }
 
 VALUES = {
@@ -44,6 +72,18 @@ VALUES = {
     (8, 7): 701,
     (8, 8): 455,
     (9, 300): 400,
+    (40, 22): 1,
+    (40, 19): 1500,
+    (40, 33): 11,
+    (40, 23): 0,
+    (40, 20): 0,
+    (40, 34): 8,
+    (40, 29): 0,
+    (24, 18): 2,
+    (24, 54): 0,
+    (24, 57): 1,
+    (24, 58): 0,
+    (24, 63): 123,
 }
 
 

@@ -12,8 +12,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .const import unit_from_name
 from .coordinator import EtaConfigEntry, EtaCoordinator
 from .entity import EtaValueEntity, device_info, entries_for_platform
+from .naming import EntityName
 from .protocol import MonitorEntry
 
 PARALLEL_UPDATES = 0
@@ -30,8 +32,10 @@ async def async_setup_entry(
         [
             EtaReadDurationSensor(coordinator),
             *(
-                EtaSensor(coordinator, monitor_entry)
-                for monitor_entry in entries_for_platform(coordinator, Platform.SENSOR)
+                EtaSensor(coordinator, monitor_entry, name)
+                for monitor_entry, name in entries_for_platform(
+                    coordinator, Platform.SENSOR
+                )
             ),
         ]
     )
@@ -40,12 +44,19 @@ async def async_setup_entry(
 class EtaSensor(EtaValueEntity, SensorEntity):
     """A numeric value of the heater."""
 
-    def __init__(self, coordinator: EtaCoordinator, entry: MonitorEntry) -> None:
+    def __init__(
+        self, coordinator: EtaCoordinator, entry: MonitorEntry, name: EntityName
+    ) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, entry)
+        super().__init__(coordinator, entry, name)
         self._attr_device_class = self.value_type.device_class  # type: ignore[assignment]
         self._attr_native_unit_of_measurement = self.value_type.unit
         self._attr_state_class = self.value_type.state_class
+        # Plain numbers may name their unit, e.g. "kg seit letzter Kübelleerung"
+        if self.value_type.unit is None and (unit := unit_from_name(entry.name)):
+            self._attr_device_class = unit.device_class
+            self._attr_native_unit_of_measurement = unit.unit
+            self._attr_state_class = unit.state_class
 
     @property
     def native_value(self) -> float | int:

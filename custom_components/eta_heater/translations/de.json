@@ -125,6 +125,47 @@
     "sensor": {
       "read_duration": {
         "name": "Lesedauer"
+      },
+      "boiler_state": {
+        "name": "{name} (Status)"
+      },
+      "drive_state": {
+        "name": "{name} (Status)"
+      },
+      "hot_water_state": {
+        "name": "{name} (Status)"
+      },
+      "number": {
+        "name": "{name} (Wert)"
+      },
+      "percentage": {
+        "name": "{name} (%)"
+      },
+      "hours": {
+        "name": "{name} (Stunden)"
+      },
+      "current": {
+        "name": "{name} (Strom)"
+      },
+      "speed": {
+        "name": "{name} (Drehzahl)"
+      },
+      "voltage": {
+        "name": "{name} (Spannung)"
+      },
+      "temperature": {
+        "name": "{name} (Temperatur)"
+      }
+    },
+    "binary_sensor": {
+      "on_off": {
+        "name": "{name} (Ein/Aus)"
+      },
+      "opening": {
+        "name": "{name} (offen)"
+      },
+      "motor": {
+        "name": "{name} (Motor)"
       }
     }
   },

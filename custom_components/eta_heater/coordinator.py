@@ -19,10 +19,11 @@ from .const import (
     DEFAULT_LEVELS,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    MOTOR_VALUE_TYPE,
     STORAGE_VERSION,
     value_type_for,
 )
-from .protocol import MonitorEntry
+from .protocol import MonitorEntry, build_monitor_list
 from .transport import TransportError
 
 _LOGGER = logging.getLogger(__name__)
@@ -113,7 +114,10 @@ class EtaCoordinator(DataUpdateCoordinator[EtaData]):
         """Read the monitor list of the configured levels and cache it."""
         levels = self.levels
         _LOGGER.info("Reading monitor list levels %s from the heater", levels)
-        monitor_list = await self.client.async_read_monitor_list(levels)
+        monitor_list = build_monitor_list(
+            await self.client.async_read_monitor_list(levels),
+            lambda entry: entry.value_type == MOTOR_VALUE_TYPE,
+        )
         if not monitor_list:
             raise MonitorListEmptyError("The heater returned an empty monitor list")
         await self._store.async_save(

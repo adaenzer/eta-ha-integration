@@ -17,23 +17,14 @@ from .fake_heater import TOPIC, FakeHeater, FakeMqttBackend, FakeSerialTransport
 
 
 async def test_read_monitor_list(heater: FakeHeater) -> None:
-    """Headings and duplicates are skipped, levels are combined."""
+    """The list is returned as read, with headings, levels in ascending order."""
     client = EtaClient(FakeSerialTransport(heater))
-    entries = await client.async_read_monitor_list([0, 1])
-    assert [e.key for e in entries] == [
-        (8, 1),
-        (8, 2),
-        (8, 3),
-        (8, 4),
-        (8, 5),
-        (8, 6),
-        (8, 7),
-        (8, 8),
-        (9, 300),
+    entries = await client.async_read_monitor_list([1, 0])
+    assert [e.name for e in entries] == [
+        name for level in (0, 1) for _, name in heater.monitor_list[level]
     ]
-    assert entries[0].name == "Kesseltemperatur"
+    assert entries[0].is_heading
     assert {e.level for e in entries} == {0, 1}
-    assert entries[-1].level == 1
 
 
 async def test_read_values_in_groups(heater: FakeHeater) -> None:
@@ -66,7 +57,7 @@ async def test_slow_answers_not_repeated(heater: FakeHeater) -> None:
     heater.delays = [0.03] * 20  # below the 0.05 s response timeout
     client = EtaClient(FakeSerialTransport(heater))
     entries = await client.async_read_monitor_list([0])
-    assert len(entries) == 8
+    assert len(entries) == len(heater.monitor_list[0])
     assert len(heater.requests_of("MA")) == len(heater.monitor_list[0]) + 1
 
 
@@ -75,7 +66,7 @@ async def test_lost_request_repeated_after_timeout(heater: FakeHeater) -> None:
     heater.drop = 1
     client = EtaClient(FakeSerialTransport(heater))
     entries = await client.async_read_monitor_list([0])
-    assert len(entries) == 8
+    assert len(entries) == len(heater.monitor_list[0])
     ma = [
         t
         for f, t in zip(heater.requests, heater.request_times, strict=True)
@@ -91,17 +82,7 @@ async def test_late_answer_not_taken_for_next(heater: FakeHeater) -> None:
     client = EtaClient(FakeSerialTransport(heater))
     with patch.object(client_module, "LATE_ANSWER_TIME", 0.1):
         entries = await client.async_read_monitor_list([0])
-    names = [e.name for e in entries]
-    assert names == [
-        "Kesseltemperatur",
-        "Kesselstatus",
-        "Luftklappe",
-        "Aussentemperatur",
-        "Unbekannt",
-        "Betriebsstunden",
-        "Puffer oben",
-        "Puffer unten",
-    ]
+    assert [e.name for e in entries] == [n for _, n in heater.monitor_list[0]]
 
 
 async def test_frame_gap(heater: FakeHeater) -> None:

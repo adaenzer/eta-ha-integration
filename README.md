@@ -29,8 +29,12 @@ All entities belong to one device per heater:
 
 - **Sensors and binary sensors** for every value of the heater's monitor list.
   The names come from the heater. Temperatures, currents, voltages, percentages
-  and operating hours get proper units. Status values (boiler, drive, hot water)
-  are shown as raw numbers, see *Known limitations*.
+  and operating hours get proper units; plain numbers whose name mentions a
+  unit (`kg`, `[Hz]`, `[mV]`) get that unit. Status values (boiler, drive, hot
+  water) are shown as raw numbers, see *Known limitations*. Each entity keeps
+  the original monitor list data as attributes: `monitor_name`, `node`,
+  `index`, `value_type`, `divider`, `level` and `section` (the heading of the
+  heater's menu it is listed under).
 - **Error event** (`event.<name>_error`) fires whenever the heater sends an
   error message (`IM`, `SE`, `SS`). Its attributes `error_type` and `message`
   hold the type and text.
@@ -130,6 +134,25 @@ The controller is easily overloaded, so the integration is strict:
   before the monitor list is read.
 - While the connection is reconfigured, the running connection is stopped
   for the connection test.
+
+### Values with the same name
+
+The heater names values for its own menu, so different values can share a
+name, e.g. the warming of the stoker motor and of the discharge motor are
+both called "Erwärmung". Such names get a suffix:
+
+1. Values of different kinds get their kind, translated:
+   "AUSTRAGUNG (Motor)" and "AUSTRAGUNG (Status)".
+2. Otherwise the nearest heading or motor above them in the monitor list:
+   "Erwärmung (STOKERSCHNECKE)" and "Erwärmung (AUSTRAGUNG)".
+3. Otherwise the nearest entry above them with another name:
+   "StellmotSOLL (P-Luftschieber)" and "StellmotSOLL (S-Luftschieber)".
+4. Otherwise node and index, e.g. "Wert (24/57)".
+
+The same value listed several times (also under other names or in other
+levels) is shown once, with the name it has where it is found first. You can
+rename any entity in Home Assistant; the name stays when the list is read
+again.
 
 ### Choosing which values are read
 
