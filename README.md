@@ -8,6 +8,21 @@ repository). It replaces the AppDaemon app `eta2hass.py` from that repository.
 Newer ETA heaters with ETAtouch offer a REST API; this integration is **not**
 for those.
 
+> [!IMPORTANT]
+> **Maintenance:** this is a personal project for one specific heater. There
+> is no intent to develop it further; it only receives bug fixes when
+> something breaks for me. Feature requests will most likely not be
+> implemented.
+>
+> **Forks welcome:** everyone may fork this repository and adapt it for their
+> own use.
+>
+> **Use at your own risk:** the code comes without any warranty. It talks to
+> your heating system's controller; you are responsible for what it does on
+> your installation.
+>
+> This project is not affiliated with or endorsed by ETA Heiztechnik GmbH.
+
 ## What it provides
 
 All entities belong to one device per heater:
