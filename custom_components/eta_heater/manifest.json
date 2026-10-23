@@ -2,7 +2,6 @@
   "domain": "eta_heater",
   "name": "ETA Heater (RS232)",
   "after_dependencies": ["mqtt"],
-  "categories": ["climate.thermostats_heating"],
   "codeowners": ["@adaenzer"],
   "config_flow": true,
   "documentation": "https://github.com/adaenzer/eta-ha-integration",
