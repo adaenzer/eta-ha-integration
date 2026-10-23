@@ -83,8 +83,10 @@ class EtaClient:
         transport.set_receiver(self._parser.feed)
 
     async def async_connect(self) -> None:
-        """Open the transport."""
+        """Open the transport and stop subscriptions left by anyone else."""
         await self.transport.async_connect()
+        async with self._lock:
+            await self._async_send(build_frame(SERVICE_UNSUBSCRIBE))
 
     async def async_disconnect(self) -> None:
         """Stop any running subscription and close the transport."""

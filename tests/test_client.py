@@ -31,6 +31,10 @@ async def test_read_values_in_groups(heater: FakeHeater) -> None:
     """PTVO only gets six values per subscription."""
     client = EtaClient(PtvoMqttTransport(FakeMqttBackend(heater), TOPIC))
     await client.async_connect()
+    # Connecting stops subscriptions left by anyone else
+    assert [f.service for f in heater.requests] == ["ME"]
+    heater.requests.clear()
+    heater.request_times.clear()
     keys = [(8, i) for i in range(1, 9)] + [(9, 300), (9, 999)]
     values = await client.async_read_values(keys)
     assert values == {key: heater.values[key] for key in keys if key in heater.values}
@@ -89,6 +93,10 @@ async def test_frame_gap(heater: FakeHeater) -> None:
     """Frames are sent with a minimum gap and never overlap operations."""
     client = EtaClient(PtvoMqttTransport(FakeMqttBackend(heater), TOPIC))
     await client.async_connect()
+    # Connecting stops subscriptions left by anyone else
+    assert [f.service for f in heater.requests] == ["ME"]
+    heater.requests.clear()
+    heater.request_times.clear()
     with patch.object(client_module, "FRAME_GAP", 0.01):
         await asyncio.gather(
             client.async_read_values([(8, i) for i in range(1, 9)]),
@@ -107,6 +115,10 @@ async def test_values_stop_without_answer(heater: FakeHeater) -> None:
     heater.answer_values = False
     client = EtaClient(PtvoMqttTransport(FakeMqttBackend(heater), TOPIC))
     await client.async_connect()
+    # Connecting stops subscriptions left by anyone else
+    assert [f.service for f in heater.requests] == ["ME"]
+    heater.requests.clear()
+    heater.request_times.clear()
     assert await client.async_read_values([(8, i) for i in range(1, 9)]) == {}
     assert [f.service for f in heater.requests] == ["MC", "ME"]
 
