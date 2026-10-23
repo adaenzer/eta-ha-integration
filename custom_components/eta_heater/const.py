@@ -16,6 +16,8 @@ from homeassistant.const import (
     UnitOfElectricPotential,
     UnitOfFrequency,
     UnitOfMass,
+    UnitOfPower,
+    UnitOfPressure,
     UnitOfTemperature,
     UnitOfTime,
 )
@@ -142,44 +144,48 @@ def value_type_for(code: int) -> ValueType:
 
 @dataclass(frozen=True, slots=True)
 class NameUnit:
-    """A unit recognized in the name of a value whose type has no unit."""
+    """A unit mentioned in the name of a value whose type has no unit."""
 
-    pattern: re.Pattern[str]
     unit: str
-    device_class: SensorDeviceClass
-    state_class: SensorStateClass
+    device_class: SensorDeviceClass | None
 
 
-# Checked in order, the first match wins
-NAME_UNITS: Final = (
-    # e.g. "kg seit letzter Kübelleerung": counts up, reset when emptied
-    NameUnit(
-        re.compile(r"\bkg\b.*\bseit\b|\bseit\b.*\bkg\b", re.IGNORECASE),
-        UnitOfMass.KILOGRAMS,
-        SensorDeviceClass.WEIGHT,
-        SensorStateClass.TOTAL_INCREASING,
-    ),
-    NameUnit(
-        re.compile(r"\bkg\b|\[kg\]", re.IGNORECASE),
-        UnitOfMass.KILOGRAMS,
-        SensorDeviceClass.WEIGHT,
-        SensorStateClass.MEASUREMENT,
-    ),
-    NameUnit(
-        re.compile(r"\[Hz\]"),
-        UnitOfFrequency.HERTZ,
-        SensorDeviceClass.FREQUENCY,
-        SensorStateClass.MEASUREMENT,
-    ),
-    NameUnit(
-        re.compile(r"\[mV\]"),
-        UnitOfElectricPotential.MILLIVOLT,
-        SensorDeviceClass.VOLTAGE,
-        SensorStateClass.MEASUREMENT,
-    ),
+# Units the heater may write into names. Single letters (A, V, h, s) only
+# count in brackets, e.g. "[A]", because they also occur as abbreviations.
+UNITS_IN_BRACKETS: Final[dict[str, NameUnit]] = {
+    "°C": NameUnit(UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE),
+    "%": NameUnit(PERCENTAGE, None),
+    "kg": NameUnit(UnitOfMass.KILOGRAMS, SensorDeviceClass.WEIGHT),
+    "Hz": NameUnit(UnitOfFrequency.HERTZ, SensorDeviceClass.FREQUENCY),
+    "mV": NameUnit(UnitOfElectricPotential.MILLIVOLT, SensorDeviceClass.VOLTAGE),
+    "V": NameUnit(UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE),
+    "mA": NameUnit(UnitOfElectricCurrent.MILLIAMPERE, SensorDeviceClass.CURRENT),
+    "A": NameUnit(UnitOfElectricCurrent.AMPERE, SensorDeviceClass.CURRENT),
+    "kW": NameUnit(UnitOfPower.KILO_WATT, SensorDeviceClass.POWER),
+    "bar": NameUnit(UnitOfPressure.BAR, SensorDeviceClass.PRESSURE),
+    "h": NameUnit(UnitOfTime.HOURS, SensorDeviceClass.DURATION),
+    "min": NameUnit(UnitOfTime.MINUTES, SensorDeviceClass.DURATION),
+    "s": NameUnit(UnitOfTime.SECONDS, SensorDeviceClass.DURATION),
+    "rpm": NameUnit(REVOLUTIONS_PER_MINUTE, None),
+    "1/min": NameUnit(REVOLUTIONS_PER_MINUTE, None),
+}
+UNITS_AS_WORDS: Final = ("kg", "Hz", "mV", "mA", "kW", "bar", "°C", "rpm")
+
+_BRACKETS = re.compile(r"\[\s*([^\]]+?)\s*\]")
+_WORDS = re.compile(
+    r"(?<!\w)(" + "|".join(re.escape(unit) for unit in UNITS_AS_WORDS) + r")(?!\w)"
 )
 
 
 def unit_from_name(name: str) -> NameUnit | None:
-    """Return the unit a value's name mentions, if any."""
-    return next((unit for unit in NAME_UNITS if unit.pattern.search(name)), None)
+    """Return the unit a value's name mentions, if any.
+
+    This only looks at the name's form, not at specific names, so it works
+    for any heater and language: "Netzfreq. [Hz]", "kg seit letzter ...".
+    """
+    for match in _BRACKETS.finditer(name):
+        if unit := UNITS_IN_BRACKETS.get(match.group(1)):
+            return unit
+    if match := _WORDS.search(name):
+        return UNITS_IN_BRACKETS[match.group(1)]
+    return None

@@ -416,7 +416,7 @@ async def test_names_and_attributes(hass: HomeAssistant, heater: FakeHeater) -> 
     ash = state(24, 63)
     assert ash.state == "12.3"
     assert ash.attributes["unit_of_measurement"] == "kg"
-    assert ash.attributes["state_class"] == "total_increasing"
+    assert ash.attributes["state_class"] == "measurement"
     assert ash.attributes["monitor_name"] == "kg seit letzter  Ent"
     assert ash.attributes["node"] == 24
     assert ash.attributes["index"] == 63

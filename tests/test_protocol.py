@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+import pytest
+
+from custom_components.eta_heater.const import unit_from_name
 from custom_components.eta_heater.protocol import (
     Frame,
     FrameParser,
@@ -140,3 +143,27 @@ def test_build_monitor_list() -> None:
     # context starts over with each level
     assert by_key[(9, 1)].section == by_key[(9, 1)].group == ""
     assert MonitorEntry.from_dict(by_key[(40, 34)].as_dict()) == by_key[(40, 34)]
+
+
+@pytest.mark.parametrize(
+    ("name", "unit"),
+    [
+        ("kg seit letzter  Küb", "kg"),
+        ("Pelletsvorrat [kg]", "kg"),
+        ("Netzfreq. [Hz]", "Hz"),
+        ("Lam.Sig.[mV]", "mV"),
+        ("Strom [ A ]", "A"),
+        ("Leistung kW", "kW"),
+        ("Druck bar", "bar"),
+        ("Laufzeit [min]", "min"),
+        ("Vorlauf [°C]", "°C"),
+        ("Austrag. A", None),  # single letters only count in brackets
+        ("Kessel", None),
+        ("Bargeld", None),  # no unit inside words
+        ("Wert [xyz]", None),
+    ],
+)
+def test_unit_from_name(name: str, unit: str | None) -> None:
+    """Units are recognized by the form of the name, not by specific names."""
+    found = unit_from_name(name)
+    assert (found.unit if found else None) == unit

@@ -30,7 +30,8 @@ All entities belong to one device per heater:
 - **Sensors and binary sensors** for every value of the heater's monitor list.
   The names come from the heater. Temperatures, currents, voltages, percentages
   and operating hours get proper units; plain numbers whose name mentions a
-  unit (`kg`, `[Hz]`, `[mV]`) get that unit. Status values (boiler, drive, hot
+  unit get that unit (in brackets like `[Hz]`, `[mV]`, `[A]`, or as a word
+  like `kg`, `kW`, `bar`). Status values (boiler, drive, hot
   water) are shown as raw numbers, see *Known limitations*. Each entity keeps
   the original monitor list data as attributes: `monitor_name`, `node`,
   `index`, `value_type`, `divider`, `level` and `section` (the heading of the
@@ -178,6 +179,23 @@ This survives restarts and updates or reinstalls of the integration through
 HACS, and it is part of Home Assistant backups, so restoring a backup on
 another instance takes it along. Deleting the integration entry deletes all
 of it; adding the heater again reads the monitor list from the heater again.
+
+## Works with any heater
+
+Nothing in the integration is tied to the values of one particular heater.
+Everything is derived from the monitor list the heater sends:
+
+- The **value type** (byte 4 of an entry) decides on/off value, temperature,
+  percentage, current, voltage, speed or hours. The known types were found by
+  testing; unknown types are shown as plain numbers.
+- **Divider, node and index** come from each entry.
+- **Units of plain numbers** come from the form of the name (brackets or a
+  unit word), in any language.
+- **Names of values sharing a name** come from the list's structure.
+- **Which values start enabled** depends on the level they were found in.
+
+If your heater uses value types that show up as plain numbers but should be
+something else, the diagnostics download lists every entry with its type.
 
 ## Known limitations
 

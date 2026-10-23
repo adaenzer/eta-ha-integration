@@ -52,11 +52,11 @@ class EtaSensor(EtaValueEntity, SensorEntity):
         self._attr_device_class = self.value_type.device_class  # type: ignore[assignment]
         self._attr_native_unit_of_measurement = self.value_type.unit
         self._attr_state_class = self.value_type.state_class
-        # Plain numbers may name their unit, e.g. "kg seit letzter Kübelleerung"
+        # Plain numbers may name their unit, e.g. "Netzfreq. [Hz]"
         if self.value_type.unit is None and (unit := unit_from_name(entry.name)):
             self._attr_device_class = unit.device_class
             self._attr_native_unit_of_measurement = unit.unit
-            self._attr_state_class = unit.state_class
+            self._attr_state_class = SensorStateClass.MEASUREMENT
 
     @property
     def native_value(self) -> float | int:
