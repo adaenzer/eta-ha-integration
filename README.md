@@ -31,7 +31,8 @@ All entities belong to one device per heater:
   The names come from the heater. Temperatures, currents, voltages, percentages
   and operating hours get proper units; plain numbers whose name mentions a
   unit get that unit (in brackets like `[Hz]`, `[mV]`, `[A]`, or as a word
-  like `kg`, `kW`, `bar`). Status values (boiler, drive, hot
+  like `kg`, `kW`, `bar`). A recognized unit in brackets is removed from the
+  entity name, since Home Assistant shows the unit anyway. Status values (boiler, drive, hot
   water) are shown as raw numbers, see *Known limitations*. Each entity keeps
   the original monitor list data as attributes: `monitor_name`, `node`,
   `index`, `value_type`, `divider`, `level` and `section` (the heading of the

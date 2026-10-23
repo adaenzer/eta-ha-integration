@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from custom_components.eta_heater.const import unit_from_name
+from custom_components.eta_heater.const import strip_unit, unit_from_name
 from custom_components.eta_heater.protocol import (
     Frame,
     FrameParser,
@@ -167,3 +167,19 @@ def test_unit_from_name(name: str, unit: str | None) -> None:
     """Units are recognized by the form of the name, not by specific names."""
     found = unit_from_name(name)
     assert (found.unit if found else None) == unit
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        ("Netzfreq. [Hz]", "Netzfreq."),
+        ("Lam.Sig.[mV]", "Lam.Sig."),
+        ("Vorlauf [°C] MK1", "Vorlauf MK1"),
+        ("kg seit letzter Ent", "kg seit letzter Ent"),  # words stay
+        ("Wert [xyz]", "Wert [xyz]"),  # unknown brackets stay
+        ("[Hz]", "[Hz]"),  # never an empty name
+    ],
+)
+def test_strip_unit(name: str, expected: str) -> None:
+    """Units in brackets are removed from names, other text is kept."""
+    assert strip_unit(name) == expected

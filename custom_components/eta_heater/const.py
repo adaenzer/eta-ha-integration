@@ -177,6 +177,15 @@ _WORDS = re.compile(
 )
 
 
+def strip_unit(name: str) -> str:
+    """Remove a recognized unit in brackets; Home Assistant shows the unit."""
+    stripped = _BRACKETS.sub(
+        lambda match: " " if match.group(1) in UNITS_IN_BRACKETS else match.group(0),
+        name,
+    )
+    return " ".join(stripped.split()) or name
+
+
 def unit_from_name(name: str) -> NameUnit | None:
     """Return the unit a value's name mentions, if any.
 

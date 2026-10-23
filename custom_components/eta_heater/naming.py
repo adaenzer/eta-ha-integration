@@ -18,7 +18,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 
-from .const import value_type_for
+from .const import strip_unit, value_type_for
 from .protocol import MonitorEntry
 
 
@@ -36,8 +36,8 @@ def _kind_label(kind: str) -> str:
 
 
 def clean_name(name: str) -> str:
-    """Collapse the padding the heater uses inside names."""
-    return " ".join(name.split())
+    """Collapse the heater's padding and drop a unit in brackets."""
+    return strip_unit(" ".join(name.split()))
 
 
 def entity_names(
