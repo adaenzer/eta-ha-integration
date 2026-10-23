@@ -95,7 +95,7 @@ async def test_monitor_list_cached(
     """The list is read on the first setup only; level changes need the button."""
     await _setup(hass, serial_entry)
     requests = len(heater.requests_of("MA"))
-    assert requests == len(heater.monitor_list[0]) + 2
+    assert requests == len(heater.monitor_list[0]) + 3
 
     await hass.config_entries.async_reload(serial_entry.entry_id)
     await hass.async_block_till_done()

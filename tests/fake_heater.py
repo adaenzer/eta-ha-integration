@@ -101,6 +101,10 @@ class FakeHeater:
         # answered with "end of list" first and the actual entry shortly after
         self.level_switch_quirk = True
         self._level: int | None = None
+        # Positions whose first request gets lost; like the real controller,
+        # the repeated request is answered with that entry and the next one
+        self.lost_positions: set[tuple[int, int]] = set()
+        self._lost: tuple[int, int] | None = None
         # Requests to ignore, and delays (seconds) for the next answers
         self.drop = 0
         self.delays: list[float] = []
@@ -136,6 +140,20 @@ class FakeHeater:
         if frame.service == "MA":
             position, level = frame.payload
             entries = self.monitor_list.get(level, [])
+            if (level, position) in self.lost_positions:
+                self.lost_positions.discard((level, position))
+                self._lost = (level, position)
+                return
+            if self._lost == (level, position) and position + 1 < len(entries):
+                self._lost = None
+                for offset, (header, name) in enumerate(
+                    entries[position : position + 2]
+                ):
+                    payload = bytes(header) + f" {name} ".encode("latin-1")
+                    asyncio.get_running_loop().call_later(
+                        0.005 * offset, self.output, build_frame("Mb", payload)
+                    )
+                return
             payload = b""
             if position < len(entries):
                 header, name = entries[position]

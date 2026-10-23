@@ -36,8 +36,10 @@ _LOGGER = logging.getLogger(__name__)
 
 # Minimum time between two frames sent to the heater
 FRAME_GAP = 0.5
-# How long to wait for an answer before a request counts as lost
-RESPONSE_TIMEOUT = 10.0
+# How long to wait for an answer before a request counts as lost. Over Zigbee
+# the answers sometimes stall for 10-25 s and then arrive in a batch; asking
+# again too early makes the controller answer with the following entry.
+RESPONSE_TIMEOUT = 30.0
 # Attempts per monitor list entry; a lost request is repeated, never earlier
 # than RESPONSE_TIMEOUT after it was sent
 MONITOR_LIST_ATTEMPTS = 3
@@ -47,7 +49,9 @@ LATE_ANSWER_TIME = 2.0
 # How long to wait for a second answer at the start of a level and when the
 # end of a level is reached, see _async_request_entry
 LEVEL_SETTLE_TIME = 1.5
-VALUES_TIMEOUT = 10.0
+# How often a position is asked again to get the same answer twice
+MAX_CONFIRMATIONS = 4
+VALUES_TIMEOUT = 30.0
 # Once the first values of a group arrived, wait this long for the rest
 MORE_VALUES_TIME = 1.0
 DISCONNECT_TIMEOUT = 30.0
@@ -137,7 +141,16 @@ class EtaClient:
     async def _async_request(
         self, request: bytes, response_service: str, attempts: int = 1
     ) -> Frame:
-        """Send a request and wait for its answer.
+        """Send a request and wait for its answer."""
+        frame, _ = await self._async_request_counted(
+            request, response_service, attempts
+        )
+        return frame
+
+    async def _async_request_counted(
+        self, request: bytes, response_service: str, attempts: int = 1
+    ) -> tuple[Frame, int]:
+        """Send a request; return its answer and how often it was sent.
 
         The request is only repeated after the previous attempt timed out.
         """
@@ -158,7 +171,7 @@ class EtaClient:
                 # A late answer to a lost attempt is dropped while no request
                 # is waiting for it
                 await asyncio.sleep(LATE_ANSWER_TIME)
-            return frame
+            return frame, attempt
         raise EtaTimeoutError(f"No {response_service} answer from heater")
 
     async def async_probe(self) -> None:
@@ -175,26 +188,44 @@ class EtaClient:
     ) -> MonitorEntry | None:
         """Request one monitor list entry; None at the end of the list.
 
-        Two quirks of the controller are handled:
+        The controller is not always consistent, so in three situations the
+        answer is only accepted once the same answer came twice in a row:
 
-        - On the first request of a level it answers "end of list" and sends
-          the actual entry a moment later, so the last answer arriving within
-          LEVEL_SETTLE_TIME is used.
-        - An "end of list" is only accepted when asking again confirms it.
+        - At the start of a level it first answers "end of list" and sends
+          the actual entry a moment later.
+        - After a request had to be repeated, it sometimes answers with the
+          entry after the requested one.
+        - An "end of list" must not end the level by mistake.
+
+        Like in the original AppDaemon implementation; but other positions
+        are only requested once, which keeps the read fast.
         """
+        service = SERVICE_MONITOR_LIST_ENTRY
         request = monitor_list_request(position, level)
-        frame = await self._async_request(
-            request, SERVICE_MONITOR_LIST_ENTRY, MONITOR_LIST_ATTEMPTS
+        frame, attempts = await self._async_request_counted(
+            request, service, MONITOR_LIST_ATTEMPTS
         )
         if position == 0:
-            frame = await self._async_last_answer(SERVICE_MONITOR_LIST_ENTRY, frame)
-        if (entry := parse_monitor_entry(frame.payload, level)) is not None:
-            return entry
-        _LOGGER.debug("End of level %d at position %d, confirming", level, position)
-        frame = await self._async_request(
-            request, SERVICE_MONITOR_LIST_ENTRY, MONITOR_LIST_ATTEMPTS
-        )
-        frame = await self._async_last_answer(SERVICE_MONITOR_LIST_ENTRY, frame)
+            frame = await self._async_last_answer(service, frame)
+        if attempts == 1 and position != 0 and frame.payload:
+            return parse_monitor_entry(frame.payload, level)
+        for _ in range(MAX_CONFIRMATIONS):
+            again, _ = await self._async_request_counted(
+                request, service, MONITOR_LIST_ATTEMPTS
+            )
+            again = await self._async_last_answer(service, again)
+            if again.payload == frame.payload:
+                break
+            _LOGGER.debug(
+                "Level %d position %d answered differently, asking again",
+                level,
+                position,
+            )
+            frame = again
+        else:
+            _LOGGER.warning(
+                "Level %d position %d gave no consistent answer", level, position
+            )
         return parse_monitor_entry(frame.payload, level)
 
     async def _async_last_answer(self, service: str, frame: Frame) -> Frame:

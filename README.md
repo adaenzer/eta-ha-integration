@@ -128,9 +128,13 @@ The controller is easily overloaded, so the integration is strict:
 - Only one thing talks to the heater at a time. While the monitor list is
   read, no values are read; the last values stay shown.
 - A new request is only sent after the previous one was answered. A request
-  without an answer counts as lost after 10 seconds; only then is it sent
-  again (monitor list entries, up to three times) or the read is stopped
-  (values: no further groups are requested).
+  without an answer counts as lost after 30 seconds (over Zigbee, answers
+  sometimes stall for 10-25 seconds); only then is it sent again (monitor
+  list entries, up to three times) or the read is stopped (values: no further
+  groups are requested).
+- Where the controller is known to be inconsistent (start and end of a level,
+  answers to a repeated request), a monitor list entry is only accepted once
+  the same answer came twice in a row.
 - At least 0.5 seconds pass between two frames sent to the heater.
 - Every value subscription is stopped again (`ME`), also after errors, and
   before the monitor list is read.

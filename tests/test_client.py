@@ -62,8 +62,8 @@ async def test_slow_answers_not_repeated(heater: FakeHeater) -> None:
     client = EtaClient(FakeSerialTransport(heater))
     entries = await client.async_read_monitor_list([0])
     assert len(entries) == len(heater.monitor_list[0])
-    # one request per entry, the end of the list and its confirmation
-    assert len(heater.requests_of("MA")) == len(heater.monitor_list[0]) + 2
+    # one request per entry; position 0 and the end of the list confirmed
+    assert len(heater.requests_of("MA")) == len(heater.monitor_list[0]) + 3
 
 
 async def test_lost_request_repeated_after_timeout(heater: FakeHeater) -> None:
@@ -77,7 +77,9 @@ async def test_lost_request_repeated_after_timeout(heater: FakeHeater) -> None:
         for f, t in zip(heater.requests, heater.request_times, strict=True)
         if f.service == "MA"
     ]
-    assert len(ma) == len(heater.monitor_list[0]) + 3
+    # the lost request, its repetition and confirmations of position 0 and
+    # the end of the list
+    assert len(ma) == len(heater.monitor_list[0]) + 4
     assert ma[1] - ma[0] >= client_module.RESPONSE_TIMEOUT
 
 
@@ -167,3 +169,13 @@ async def test_level_switch_quirk(heater: FakeHeater) -> None:
 
     heater.level_switch_quirk = False
     assert [e.name for e in await client.async_read_monitor_list([0, 1, 2])] == expected
+
+
+async def test_answer_after_repeat_confirmed(heater: FakeHeater) -> None:
+    """After a repeated request the answer is confirmed, so nothing shifts."""
+    heater.lost_positions = {(0, 3), (2, 6)}
+    client = EtaClient(FakeSerialTransport(heater))
+    with patch.object(client_module, "LATE_ANSWER_TIME", 0.002):
+        entries = await client.async_read_monitor_list([0, 2])
+    expected = [n for level in (0, 2) for _, n in heater.monitor_list[level]]
+    assert [e.name for e in entries] == expected
