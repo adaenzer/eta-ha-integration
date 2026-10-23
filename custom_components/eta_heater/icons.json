@@ -1,0 +1,15 @@
+{
+  "entity": {
+    "button": {
+      "reread_monitor_list": { "default": "mdi:format-list-bulleted" }
+    },
+    "event": {
+      "error": { "default": "mdi:alert-circle" }
+    },
+    "sensor": {
+      "boiler_state": { "default": "mdi:fire" },
+      "drive_state": { "default": "mdi:cog" },
+      "hot_water_state": { "default": "mdi:water-boiler" }
+    }
+  }
+}

@@ -1,0 +1,172 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Wie ist die Heizung angeschlossen?",
+        "menu_options": {
+          "ptvo_mqtt": "PTVO Zigbee UART über zigbee2mqtt",
+          "serial": "Direkte serielle Verbindung"
+        },
+        "menu_option_descriptions": {
+          "ptvo_mqtt": "Ein Zigbee-Gerät mit PTVO-Firmware verbindet die RS232-Schnittstelle der Heizung, zigbee2mqtt stellt sie über MQTT bereit.",
+          "serial": "Die RS232-Schnittstelle der Heizung ist direkt am Home-Assistant-Host angeschlossen, z. B. über einen USB-Seriell-Adapter."
+        }
+      },
+      "ptvo_mqtt": {
+        "title": "PTVO-Gerät",
+        "data": {
+          "topic": "zigbee2mqtt-Topic",
+          "broker": "MQTT-Broker"
+        },
+        "data_description": {
+          "topic": "Basis-Topic des PTVO-Geräts in zigbee2mqtt, ohne /set.",
+          "broker": "Den Broker der MQTT-Integration von Home Assistant oder einen anderen verwenden."
+        }
+      },
+      "broker": {
+        "title": "Externer MQTT-Broker",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "username": "Benutzername",
+          "password": "Passwort"
+        },
+        "data_description": {
+          "host": "Hostname oder IP-Adresse des MQTT-Brokers, an den zigbee2mqtt sendet.",
+          "port": "Port des MQTT-Brokers.",
+          "username": "Leer lassen, wenn der Broker anonymen Zugriff erlaubt.",
+          "password": "Passwort des MQTT-Benutzers."
+        }
+      },
+      "serial": {
+        "title": "Serielle Verbindung",
+        "data": {
+          "device": "Serielle Schnittstelle",
+          "baudrate": "Baudrate"
+        },
+        "data_description": {
+          "device": "Möglichst einen /dev/serial/by-id/-Pfad verwenden, er ändert sich beim Umstecken nicht.",
+          "baudrate": "Die Heizung verwendet 19200 Baud, 8 Datenbits, keine Parität, 1 Stoppbit."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Verbindung fehlgeschlagen",
+      "mqtt_not_available": "Die MQTT-Integration ist nicht eingerichtet. Zuerst einrichten oder einen externen Broker verwenden.",
+      "no_response": "Verbunden, aber die Heizung antwortet nicht."
+    },
+    "abort": {
+      "already_configured": "Diese Verbindung ist bereits eingerichtet",
+      "reconfigure_successful": "Die Neukonfiguration war erfolgreich"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "levels": "Ebenen der Monitorliste",
+          "scan_interval": "Aktualisierungsintervall",
+          "publish_errors": "Störmeldungen über MQTT senden"
+        },
+        "data_description": {
+          "levels": "Welche Ebenen der Monitorliste gelesen werden. Eine Änderung liest die Liste neu von der Heizung, das dauert einige Minuten.",
+          "scan_interval": "Wie oft alle Werte von der Heizung gelesen werden.",
+          "publish_errors": "Störmeldungen zusätzlich als JSON an <Topic>/error senden, wie die bisherige AppDaemon-App."
+        }
+      }
+    },
+    "error": {
+      "invalid_levels": "Mindestens eine Ebene zwischen 0 und 255 angeben."
+    }
+  },
+  "selector": {
+    "broker": {
+      "options": {
+        "home_assistant": "MQTT-Integration von Home Assistant",
+        "external": "Externer Broker"
+      }
+    }
+  },
+  "entity": {
+    "button": {
+      "reread_monitor_list": {
+        "name": "Monitorliste neu einlesen"
+      }
+    },
+    "event": {
+      "error": {
+        "name": "Störmeldung",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "error": "Störmeldung"
+            }
+          },
+          "error_type": {
+            "name": "Meldungstyp"
+          },
+          "message": {
+            "name": "Meldung"
+          }
+        }
+      }
+    },
+    "sensor": {
+      "boiler_state": {
+        "state": {
+          "off": "Ausgeschaltet",
+          "heating_up": "Heizvers.",
+          "igniting": "Zündet",
+          "heating": "Heizt",
+          "ember_burnout": "Glutabbrand",
+          "ready": "Bereit",
+          "deashing": "Entaschen",
+          "locked": "Gesperrt",
+          "external_heat": "Fremdwärme",
+          "calibrating": "Kalibrieren",
+          "fault": "Störung"
+        }
+      },
+      "drive_state": {
+        "state": {
+          "off": "Aus",
+          "on": "Ein",
+          "fault": "Störung",
+          "emptying": "Leeren",
+          "self_test": "Selbsttest",
+          "reverse": "Retour"
+        }
+      },
+      "hot_water_state": {
+        "state": {
+          "charging": "Laden",
+          "charged": "Geladen",
+          "requesting": "Fordert an",
+          "off_by_timer": "Aus (Uhr)",
+          "solar_priority": "Solarvorrang",
+          "fault": "Störung"
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "cannot_connect": {
+      "message": "Keine Verbindung zur Heizung: {error}"
+    },
+    "mqtt_not_available": {
+      "message": "Die MQTT-Integration ist nicht verfügbar"
+    },
+    "monitor_list_failed": {
+      "message": "Lesen der Monitorliste fehlgeschlagen: {error}"
+    },
+    "monitor_list_empty": {
+      "message": "Die Heizung hat eine leere Monitorliste geliefert"
+    },
+    "update_failed": {
+      "message": "Lesen der Werte fehlgeschlagen: {error}"
+    },
+    "no_values": {
+      "message": "Die Heizung hat keine Werte gesendet"
+    }
+  }
+}

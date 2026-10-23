@@ -1,0 +1,13 @@
+{
+  "domain": "eta_heater",
+  "name": "ETA Heater (RS232)",
+  "after_dependencies": ["mqtt"],
+  "codeowners": ["@adaenzer"],
+  "config_flow": true,
+  "documentation": "https://github.com/adaenzer/eta-integration",
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/adaenzer/eta-integration/issues",
+  "requirements": ["serialx>=1.11.0"],
+  "version": "0.1.0"
+}

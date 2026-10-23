@@ -1,0 +1,172 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "How is the heater connected?",
+        "menu_options": {
+          "ptvo_mqtt": "PTVO Zigbee UART via zigbee2mqtt",
+          "serial": "Direct serial connection"
+        },
+        "menu_option_descriptions": {
+          "ptvo_mqtt": "A PTVO firmware Zigbee device bridges the heater's RS232 port, zigbee2mqtt publishes it on MQTT.",
+          "serial": "The heater's RS232 port is connected to the Home Assistant host, e.g. with a USB serial adapter."
+        }
+      },
+      "ptvo_mqtt": {
+        "title": "PTVO device",
+        "data": {
+          "topic": "zigbee2mqtt topic",
+          "broker": "MQTT broker"
+        },
+        "data_description": {
+          "topic": "Base topic of the PTVO device in zigbee2mqtt, without /set.",
+          "broker": "Use the broker of Home Assistant's MQTT integration or a different one."
+        }
+      },
+      "broker": {
+        "title": "External MQTT broker",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "username": "Username",
+          "password": "Password"
+        },
+        "data_description": {
+          "host": "Hostname or IP address of the MQTT broker zigbee2mqtt publishes to.",
+          "port": "Port of the MQTT broker.",
+          "username": "Leave empty if the broker allows anonymous access.",
+          "password": "Password of the MQTT user."
+        }
+      },
+      "serial": {
+        "title": "Serial connection",
+        "data": {
+          "device": "Serial port",
+          "baudrate": "Baud rate"
+        },
+        "data_description": {
+          "device": "Prefer a /dev/serial/by-id/ path, it does not change when devices are plugged in.",
+          "baudrate": "The heater uses 19200 baud, 8 data bits, no parity, 1 stop bit."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect",
+      "mqtt_not_available": "The MQTT integration is not set up. Set it up first or use an external broker.",
+      "no_response": "Connected, but the heater did not answer."
+    },
+    "abort": {
+      "already_configured": "This connection is already configured",
+      "reconfigure_successful": "Re-configuration was successful"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "levels": "Monitor list levels",
+          "scan_interval": "Update interval",
+          "publish_errors": "Publish errors to MQTT"
+        },
+        "data_description": {
+          "levels": "Levels of the heater's monitor list to read. Changing them reads the list from the heater again, which takes a few minutes.",
+          "scan_interval": "How often all values are read from the heater.",
+          "publish_errors": "Also publish error messages as JSON to <topic>/error, like the former AppDaemon app."
+        }
+      }
+    },
+    "error": {
+      "invalid_levels": "Enter at least one level between 0 and 255."
+    }
+  },
+  "selector": {
+    "broker": {
+      "options": {
+        "home_assistant": "Home Assistant MQTT integration",
+        "external": "External broker"
+      }
+    }
+  },
+  "entity": {
+    "button": {
+      "reread_monitor_list": {
+        "name": "Read monitor list again"
+      }
+    },
+    "event": {
+      "error": {
+        "name": "Error",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "error": "Error"
+            }
+          },
+          "error_type": {
+            "name": "Error type"
+          },
+          "message": {
+            "name": "Message"
+          }
+        }
+      }
+    },
+    "sensor": {
+      "boiler_state": {
+        "state": {
+          "off": "Off",
+          "heating_up": "Preheating",
+          "igniting": "Igniting",
+          "heating": "Heating",
+          "ember_burnout": "Ember burnout",
+          "ready": "Ready",
+          "deashing": "De-ashing",
+          "locked": "Locked",
+          "external_heat": "External heat",
+          "calibrating": "Calibrating",
+          "fault": "Fault"
+        }
+      },
+      "drive_state": {
+        "state": {
+          "off": "Off",
+          "on": "On",
+          "fault": "Fault",
+          "emptying": "Emptying",
+          "self_test": "Self test",
+          "reverse": "Reverse"
+        }
+      },
+      "hot_water_state": {
+        "state": {
+          "charging": "Charging",
+          "charged": "Charged",
+          "requesting": "Requesting",
+          "off_by_timer": "Off (timer)",
+          "solar_priority": "Solar priority",
+          "fault": "Fault"
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "cannot_connect": {
+      "message": "Cannot connect to the heater: {error}"
+    },
+    "mqtt_not_available": {
+      "message": "The MQTT integration is not available"
+    },
+    "monitor_list_failed": {
+      "message": "Reading the monitor list from the heater failed: {error}"
+    },
+    "monitor_list_empty": {
+      "message": "The heater returned an empty monitor list"
+    },
+    "update_failed": {
+      "message": "Reading values from the heater failed: {error}"
+    },
+    "no_values": {
+      "message": "The heater did not send any values"
+    }
+  }
+}
