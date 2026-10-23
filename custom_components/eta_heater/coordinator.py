@@ -221,7 +221,8 @@ class EtaCoordinator(DataUpdateCoordinator[EtaData]):
                 translation_key="update_failed",
                 translation_placeholders={"error": str(err)},
             ) from err
-        if not raw:
+        data = {e.key: e.scale(raw[e.key]) for e in selected if e.key in raw}
+        if not data:
             raise UpdateFailed(translation_domain=DOMAIN, translation_key="no_values")
         self.last_read_duration = monotonic() - start
-        return {e.key: e.scale(raw[e.key]) for e in selected if e.key in raw}
+        return data

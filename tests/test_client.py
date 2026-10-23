@@ -147,3 +147,17 @@ async def test_error_listener(heater: FakeHeater) -> None:
     remove()
     heater.send_error("IM", "ignored")
     assert [(e.service, e.text) for e in errors] == [("SE", "Fühler defekt")]
+
+
+async def test_foreign_values_ignored(heater: FakeHeater) -> None:
+    """Values another program requested do not count as an answer."""
+    heater.foreign_values = True
+    client = EtaClient(FakeSerialTransport(heater))
+    assert await client.async_read_values([(8, 1), (8, 2)]) == {(8, 1): 652, (8, 2): 3}
+
+    heater.answer_values = False
+    heater.requests.clear()
+    keys = [(8, i) for i in range(1, 9)]
+    client.transport.max_values_per_request = 4  # type: ignore[misc]
+    assert await client.async_read_values(keys) == {}
+    assert [f.service for f in heater.requests] == ["MC", "ME"]

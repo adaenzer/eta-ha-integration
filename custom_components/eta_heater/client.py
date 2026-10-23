@@ -225,14 +225,20 @@ class EtaClient:
         assert self._value_queue is not None
         missing = set(wanted)
         timeout = VALUES_TIMEOUT
+        deadline = asyncio.get_running_loop().time() + timeout
         try:
             while missing:
-                async with asyncio.timeout(timeout):
+                async with asyncio.timeout_at(deadline):
                     values = await self._value_queue.get()
-                result.update(values)
-                missing -= values.keys()
+                # Values requested by someone else (another program talking
+                # to the heater, or an earlier subscription) are ignored
+                if not (received := values.keys() & wanted):
+                    _LOGGER.debug("Ignoring values not requested: %s", sorted(values))
+                    continue
+                result.update({key: values[key] for key in received})
+                missing -= received
                 # Values the heater does not know never arrive
-                timeout = MORE_VALUES_TIME
+                deadline = asyncio.get_running_loop().time() + MORE_VALUES_TIME
         except TimeoutError:
             _LOGGER.debug("No value received for %s", sorted(missing))
         return missing != wanted

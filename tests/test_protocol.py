@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 from custom_components.eta_heater.protocol import (
     Frame,
     FrameParser,
@@ -76,3 +78,29 @@ def test_values_and_entries() -> None:
     assert entry.scale(0xFFF6) == -1.0
     assert MonitorEntry.from_dict(entry.as_dict()) == entry
     assert parse_monitor_entry(b"") is None
+
+
+def test_divider_is_16_bit() -> None:
+    """The divider spans header bytes 6 and 7."""
+    entry = parse_monitor_entry(bytes([40, 0, 19, 0, 65, 2, 3, 232, 2]) + b"Strom")
+    assert entry is not None
+    assert entry.divider == 1000
+    assert entry.scale(1500) == 1.5
+
+
+def test_stale_fragment_dropped() -> None:
+    """An incomplete frame does not swallow a frame arriving much later."""
+    frames: list[Frame] = []
+    parser = FrameParser(frames.append)
+    md = build_frame("MD", bytes([8, 0, 1, 2, 140]))
+    with patch("custom_components.eta_heater.protocol.monotonic", return_value=10.0):
+        parser.feed(md[:6])
+    with patch("custom_components.eta_heater.protocol.monotonic", return_value=11.0):
+        parser.feed(md[6:])
+    assert [f.service for f in frames] == ["MD"]
+
+    with patch("custom_components.eta_heater.protocol.monotonic", return_value=20.0):
+        parser.feed(md[:6])
+    with patch("custom_components.eta_heater.protocol.monotonic", return_value=25.0):
+        parser.feed(md)
+    assert [f.service for f in frames] == ["MD", "MD"]

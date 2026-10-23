@@ -17,6 +17,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 import logging
+from time import monotonic
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -24,6 +25,9 @@ FRAME_START = 0x7B  # '{'
 FRAME_END = 0x7D  # '}'
 FRAME_OVERHEAD = 6  # start, service id (2), length, checksum, end
 MAX_BUFFER_SIZE = 512
+# An incomplete frame older than this is dropped when a new frame starts, so
+# that a lost fragment does not corrupt the next frame
+STALE_FRAME_TIME = 2.0
 
 # Request -> response service ids
 SERVICE_MONITOR_LIST = "MA"  # -> Mb, one monitor list entry per request
@@ -88,6 +92,7 @@ class FrameParser:
         """Initialize the parser."""
         self._on_frame = on_frame
         self._buffer = bytearray()
+        self._last_data = 0.0
 
     def reset(self) -> None:
         """Drop any partially received data."""
@@ -95,6 +100,15 @@ class FrameParser:
 
     def feed(self, data: bytes) -> None:
         """Add received bytes and emit every complete frame."""
+        now = monotonic()
+        if (
+            self._buffer
+            and now - self._last_data > STALE_FRAME_TIME
+            and data.startswith(FRAME_STARTS)
+        ):
+            _LOGGER.debug("Dropping incomplete frame %s", bytes(self._buffer).hex(" "))
+            self._buffer.clear()
+        self._last_data = now
         self._buffer += data
         while self._buffer:
             if not self._resync():
@@ -190,7 +204,7 @@ class MonitorEntry:
             node=header[0],
             index=header[1] * 256 + header[2],
             value_type=header[4],
-            divider=header[7],
+            divider=header[6] * 256 + header[7],
             name=name,
             header=header,
             level=level,

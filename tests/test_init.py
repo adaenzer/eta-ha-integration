@@ -363,3 +363,17 @@ async def test_no_value_reads_during_reread(
     await coordinator.async_refresh()
     assert not heater.requests
     assert hass.states.get(temp).state == "65.2"
+
+
+async def test_only_foreign_values_fail_update(
+    hass: HomeAssistant, heater: FakeHeater, serial_entry: MockConfigEntry
+) -> None:
+    """An update without any requested value marks the entities unavailable."""
+    await _setup(hass, serial_entry)
+    heater.foreign_values = True
+    heater.answer_values = False
+    await serial_entry.runtime_data.async_refresh()
+    assert not serial_entry.runtime_data.last_update_success
+    assert (
+        hass.states.get(_entity_id(hass, serial_entry, 8, 1)).state == STATE_UNAVAILABLE
+    )

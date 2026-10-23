@@ -56,6 +56,7 @@ class FakeHeater:
         self.values = dict(VALUES)
         self.respond = True
         self.answer_values = True
+        self.foreign_values = False
         # Requests to ignore, and delays (seconds) for the next answers
         self.drop = 0
         self.delays: list[float] = []
@@ -96,13 +97,21 @@ class FakeHeater:
                 header, name = entries[position]
                 payload = bytes(header) + f" {name} ".encode("latin-1")
             self._send(build_frame("Mb", payload))
+        elif frame.service == "MC" and self.foreign_values:
+            # Answer to a request of another program talking to the heater
+            self._send(build_frame("MD", bytes([24, 0, 153, 0, 7])))
+            if self.answer_values:
+                self._answer_values(frame)
         elif frame.service == "MC" and self.answer_values:
-            payload = b""
-            for pos in range(1, len(frame.payload), 3):
-                node, hb, lb = frame.payload[pos : pos + 3]
-                if (value := self.values.get((node, hb * 256 + lb))) is not None:
-                    payload += bytes([node, hb, lb, value // 256, value % 256])
-            self._send(build_frame("MD", payload))
+            self._answer_values(frame)
+
+    def _answer_values(self, frame: Frame) -> None:
+        payload = b""
+        for pos in range(1, len(frame.payload), 3):
+            node, hb, lb = frame.payload[pos : pos + 3]
+            if (value := self.values.get((node, hb * 256 + lb))) is not None:
+                payload += bytes([node, hb, lb, value // 256, value % 256])
+        self._send(build_frame("MD", payload))
 
 
 class FakeSerialTransport(Transport):
