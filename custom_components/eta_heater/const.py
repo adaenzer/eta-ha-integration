@@ -35,9 +35,9 @@ CONF_PUBLISH_ERRORS: Final = "publish_errors"
 DEFAULT_TOPIC: Final = "zigbee2mqtt/heater"
 DEFAULT_MQTT_PORT: Final = 1883
 DEFAULT_LEVELS: Final = [0]
-DEFAULT_SCAN_INTERVAL: Final = 120
+DEFAULT_SCAN_INTERVAL: Final = 300
 MIN_SCAN_INTERVAL: Final = 30
-AVAILABLE_LEVELS: Final = [str(level) for level in range(10)]
+AVAILABLE_LEVELS: Final = ["0", "1", "2", "3"]
 
 ERROR_TOPIC_SUFFIX: Final = "/error"
 EVENT_TYPE_ERROR: Final = "error"
@@ -112,3 +112,8 @@ VALUE_TYPES: Final[dict[int, ValueType]] = {
 
 # Unknown value types are shown as plain sensors with the raw value
 UNKNOWN_VALUE_TYPE: Final = ValueType(Platform.SENSOR)
+
+
+def value_type_for(code: int) -> ValueType:
+    """Return how a monitor list value type is shown."""
+    return VALUE_TYPES.get(code, UNKNOWN_VALUE_TYPE)

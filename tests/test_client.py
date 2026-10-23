@@ -27,6 +27,8 @@ async def test_read_monitor_list(heater: FakeHeater) -> None:
         (9, 300),
     ]
     assert entries[0].name == "Kesseltemperatur"
+    assert {e.level for e in entries} == {0, 1}
+    assert entries[-1].level == 1
 
 
 async def test_read_values_in_groups(heater: FakeHeater) -> None:

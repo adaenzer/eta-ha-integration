@@ -21,6 +21,8 @@ All entities belong to one device per heater:
   hold the type and text.
 - **Read monitor list again** button, for when the heater's configuration
   changed.
+- **Read duration** diagnostic sensor: how long reading all enabled values
+  took, to help choose the update interval.
 
 With the PTVO/MQTT connection, error messages are also published as JSON to
 `<topic>/error`, exactly like the AppDaemon app did, so existing automations
@@ -73,8 +75,8 @@ Before the entry is created, the integration checks that the heater answers.
 
 | Option | Default | Description |
 |---|---|---|
-| Monitor list levels | `0` | Levels of the monitor list to read. Changing them reads the list again. |
-| Update interval | 120 s | How often all values are read. |
+| Monitor list levels | `0` | Levels 0–3 of the monitor list. Deeper levels add more values. Changing them reads the list again. |
+| Update interval | 300 s | How often the enabled values are read. |
 | Publish errors to MQTT | on | PTVO only: also publish errors to `<topic>/error`. |
 
 Connection settings can be changed later with **Reconfigure**.
@@ -88,6 +90,31 @@ cached and only read again when the levels change or the button is pressed.
 Values are polled at the update interval: the integration subscribes to a
 group of values, waits for the heater to send them, unsubscribes and continues
 with the next group. Values the heater does not send become unavailable.
+
+### Choosing which values are read
+
+Only values whose entity is **enabled** are read from the heater. Values of
+the lowest selected level are enabled when they are first created; values
+that only deeper levels add are created disabled. Enable or disable single
+entities on the device page (or under *Settings → Entities*) to choose what
+is read. Fewer values make a read faster, which the *Read duration* sensor
+shows, so a shorter update interval becomes possible. After enabling an
+entity, Home Assistant reloads the integration within about 30 seconds.
+
+## Where data is stored
+
+Everything is stored by Home Assistant itself, nothing in zigbee2mqtt topics:
+
+| Data | Location |
+|---|---|
+| Connection settings and options | Config entry (`.storage/core.config_entries`) |
+| Which values are read (enabled entities) | Entity registry (`.storage/core.entity_registry`) |
+| Cached monitor list | `.storage/eta_heater.<entry id>` |
+
+This survives restarts and updates or reinstalls of the integration through
+HACS, and it is part of Home Assistant backups, so restoring a backup on
+another instance takes it along. Deleting the integration entry deletes all
+of it; adding the heater again reads the monitor list from the heater again.
 
 ## Known limitations
 

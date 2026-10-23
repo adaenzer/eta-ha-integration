@@ -124,17 +124,21 @@ class EtaClient:
             )
 
     async def async_read_monitor_list(self, levels: list[int]) -> list[MonitorEntry]:
-        """Read the monitor list for the given levels, without duplicates."""
+        """Read the monitor list for the given levels, without duplicates.
+
+        Levels are read in ascending order, so each entry keeps the lowest
+        level it was found in.
+        """
         entries: dict[tuple[int, int], MonitorEntry] = {}
         async with self._lock:
             await self.transport.async_send(build_frame(SERVICE_STOP))
-            for level in levels:
+            for level in sorted(levels):
                 for position in range(MAX_MONITOR_ENTRIES):
                     frame = await self._async_request(
                         monitor_list_request(position, level),
                         SERVICE_MONITOR_LIST_ENTRY,
                     )
-                    entry = parse_monitor_entry(frame.payload)
+                    entry = parse_monitor_entry(frame.payload, level)
                     if entry is None:
                         break
                     # Node 0 entries are headings, not values

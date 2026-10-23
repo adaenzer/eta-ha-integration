@@ -69,14 +69,14 @@
           "publish_errors": "Störmeldungen über MQTT senden"
         },
         "data_description": {
-          "levels": "Welche Ebenen der Monitorliste gelesen werden. Eine Änderung liest die Liste neu von der Heizung, das dauert einige Minuten.",
-          "scan_interval": "Wie oft alle Werte von der Heizung gelesen werden.",
+          "levels": "Ebenen 0 bis 3 der Monitorliste der Heizung. Tiefere Ebenen liefern mehr Werte; deren Entitäten werden deaktiviert angelegt und können einzeln aktiviert werden. Eine Änderung liest die Liste neu von der Heizung, das dauert einige Minuten.",
+          "scan_interval": "Wie oft die aktivierten Werte von der Heizung gelesen werden. Der Diagnosesensor Lesedauer zeigt, wie lange ein Lesevorgang dauert; nicht benötigte Entitäten zu deaktivieren verkürzt ihn.",
           "publish_errors": "Störmeldungen zusätzlich als JSON an <Topic>/error senden, wie die bisherige AppDaemon-App."
         }
       }
     },
     "error": {
-      "invalid_levels": "Mindestens eine Ebene zwischen 0 und 255 angeben."
+      "invalid_levels": "Mindestens eine Ebene auswählen."
     }
   },
   "selector": {
@@ -109,6 +109,11 @@
             "name": "Meldung"
           }
         }
+      }
+    },
+    "sensor": {
+      "read_duration": {
+        "name": "Lesedauer"
       }
     }
   },

@@ -156,6 +156,8 @@ class MonitorEntry:
     divider: int
     name: str
     header: tuple[int, ...]
+    # Lowest monitor list level the entry was found in
+    level: int = 0
 
     @property
     def key(self) -> tuple[int, int]:
@@ -171,16 +173,18 @@ class MonitorEntry:
 
     def as_dict(self) -> dict[str, object]:
         """Serialize for storage."""
-        return {"header": list(self.header), "name": self.name}
+        return {"header": list(self.header), "name": self.name, "level": self.level}
 
     @classmethod
     def from_dict(cls, data: dict[str, object]) -> MonitorEntry:
         """Restore from storage."""
         header = tuple(int(b) for b in data["header"])  # type: ignore[union-attr]
-        return cls.from_header(header, str(data["name"]))
+        return cls.from_header(header, str(data["name"]), int(data.get("level", 0)))  # type: ignore[call-overload]
 
     @classmethod
-    def from_header(cls, header: tuple[int, ...], name: str) -> MonitorEntry:
+    def from_header(
+        cls, header: tuple[int, ...], name: str, level: int = 0
+    ) -> MonitorEntry:
         """Create an entry from the 9 header bytes and its name."""
         return cls(
             node=header[0],
@@ -189,16 +193,17 @@ class MonitorEntry:
             divider=header[7],
             name=name,
             header=header,
+            level=level,
         )
 
 
-def parse_monitor_entry(payload: bytes) -> MonitorEntry | None:
+def parse_monitor_entry(payload: bytes, level: int = 0) -> MonitorEntry | None:
     """Parse an Mb payload; an empty payload marks the end of the list."""
     if len(payload) < MONITOR_ENTRY_HEADER_LEN:
         return None
     header = tuple(payload[:MONITOR_ENTRY_HEADER_LEN])
     name = payload[MONITOR_ENTRY_HEADER_LEN:].decode(ENCODING).strip()
-    return MonitorEntry.from_header(header, name)
+    return MonitorEntry.from_header(header, name, level)
 
 
 def parse_values(payload: bytes) -> dict[tuple[int, int], int] | None:

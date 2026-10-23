@@ -28,6 +28,7 @@ class EtaRereadMonitorListButton(ButtonEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "reread_monitor_list"
     _attr_entity_category = EntityCategory.CONFIG
+    _attr_should_poll = False
 
     def __init__(self, entry: EtaConfigEntry) -> None:
         """Initialize the button."""

@@ -69,14 +69,14 @@
           "publish_errors": "Publish errors to MQTT"
         },
         "data_description": {
-          "levels": "Levels of the heater's monitor list to read. Changing them reads the list from the heater again, which takes a few minutes.",
-          "scan_interval": "How often all values are read from the heater.",
+          "levels": "Levels 0 to 3 of the heater's monitor list. Deeper levels add more values; their entities are created disabled and can be enabled one by one. Changing the levels reads the list from the heater again, which takes a few minutes.",
+          "scan_interval": "How often the enabled values are read from the heater. The diagnostic sensor Read duration shows how long one read takes; disabling entities you do not need makes it shorter.",
           "publish_errors": "Also publish error messages as JSON to <topic>/error, like the former AppDaemon app."
         }
       }
     },
     "error": {
-      "invalid_levels": "Enter at least one level between 0 and 255."
+      "invalid_levels": "Select at least one level."
     }
   },
   "selector": {
@@ -109,6 +109,11 @@
             "name": "Message"
           }
         }
+      }
+    },
+    "sensor": {
+      "read_duration": {
+        "name": "Read duration"
       }
     }
   },

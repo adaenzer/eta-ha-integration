@@ -200,7 +200,7 @@ async def test_options(hass: HomeAssistant, ptvo_entry: MockConfigEntry) -> None
     assert CONF_PUBLISH_ERRORS in result["data_schema"].schema
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
-        {CONF_LEVELS: ["x"], CONF_SCAN_INTERVAL: 60, CONF_PUBLISH_ERRORS: False},
+        {CONF_LEVELS: [], CONF_SCAN_INTERVAL: 60, CONF_PUBLISH_ERRORS: False},
     )
     assert result["errors"] == {CONF_LEVELS: "invalid_levels"}
     result = await hass.config_entries.options.async_configure(

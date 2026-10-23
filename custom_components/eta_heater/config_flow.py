@@ -300,11 +300,8 @@ class EtaOptionsFlow(OptionsFlowWithReload):
         """Manage the options."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            try:
-                levels = sorted({int(level) for level in user_input[CONF_LEVELS]})
-            except ValueError:
-                levels = []
-            if levels and all(0 <= level <= 255 for level in levels):
+            levels = sorted({int(level) for level in user_input[CONF_LEVELS]})
+            if levels:
                 return self.async_create_entry(data={**user_input, CONF_LEVELS: levels})
             errors[CONF_LEVELS] = "invalid_levels"
 
@@ -315,7 +312,9 @@ class EtaOptionsFlow(OptionsFlowWithReload):
                 default=[str(lvl) for lvl in options.get(CONF_LEVELS, DEFAULT_LEVELS)],
             ): SelectSelector(
                 SelectSelectorConfig(
-                    options=AVAILABLE_LEVELS, multiple=True, custom_value=True
+                    options=AVAILABLE_LEVELS,
+                    multiple=True,
+                    mode=SelectSelectorMode.LIST,
                 )
             ),
             vol.Required(

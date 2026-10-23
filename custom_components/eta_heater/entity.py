@@ -6,8 +6,8 @@ from homeassistant.const import Platform
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, UNKNOWN_VALUE_TYPE, VALUE_TYPES, ValueType
-from .coordinator import EtaConfigEntry, EtaCoordinator
+from .const import DOMAIN, value_type_for
+from .coordinator import EtaConfigEntry, EtaCoordinator, value_unique_id
 from .protocol import MonitorEntry
 
 
@@ -21,16 +21,15 @@ def device_info(entry: EtaConfigEntry) -> DeviceInfo:
     )
 
 
-def value_type(entry: MonitorEntry) -> ValueType:
-    """Return how a monitor list entry is shown."""
-    return VALUE_TYPES.get(entry.value_type, UNKNOWN_VALUE_TYPE)
-
-
 def entries_for_platform(
     coordinator: EtaCoordinator, platform: Platform
 ) -> list[MonitorEntry]:
     """Return the monitor list entries that belong to a platform."""
-    return [e for e in coordinator.monitor_list if value_type(e).platform == platform]
+    return [
+        e
+        for e in coordinator.monitor_list
+        if value_type_for(e.value_type).platform == platform
+    ]
 
 
 class EtaValueEntity(CoordinatorEntity[EtaCoordinator]):
@@ -42,12 +41,14 @@ class EtaValueEntity(CoordinatorEntity[EtaCoordinator]):
         """Initialize the entity."""
         super().__init__(coordinator)
         self.monitor_entry = entry
-        self.value_type = value_type(entry)
+        self.value_type = value_type_for(entry.value_type)
         # Names come from the heater, so they cannot be translated
         self._attr_name = entry.name
         self._attr_translation_key = self.value_type.translation_key
-        self._attr_unique_id = (
-            f"{coordinator.config_entry.entry_id}_{entry.node}_{entry.index}"
+        self._attr_unique_id = value_unique_id(coordinator.config_entry.entry_id, entry)
+        # Disabled entities are not read from the heater, see the coordinator
+        self._attr_entity_registry_enabled_default = coordinator.enabled_by_default(
+            entry
         )
         self._attr_device_info = device_info(coordinator.config_entry)
 

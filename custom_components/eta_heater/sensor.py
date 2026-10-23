@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
-from homeassistant.components.sensor import SensorEntity
-from homeassistant.const import Platform
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorStateClass,
+)
+from homeassistant.const import EntityCategory, Platform, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .coordinator import EtaConfigEntry, EtaCoordinator
-from .entity import EtaValueEntity, entries_for_platform
+from .entity import EtaValueEntity, device_info, entries_for_platform
 from .protocol import MonitorEntry
 
 PARALLEL_UPDATES = 0
@@ -22,8 +27,13 @@ async def async_setup_entry(
     """Set up sensors from the monitor list."""
     coordinator = entry.runtime_data
     async_add_entities(
-        EtaSensor(coordinator, monitor_entry)
-        for monitor_entry in entries_for_platform(coordinator, Platform.SENSOR)
+        [
+            EtaReadDurationSensor(coordinator),
+            *(
+                EtaSensor(coordinator, monitor_entry)
+                for monitor_entry in entries_for_platform(coordinator, Platform.SENSOR)
+            ),
+        ]
     )
 
 
@@ -41,3 +51,26 @@ class EtaSensor(EtaValueEntity, SensorEntity):
     def native_value(self) -> float | int:
         """Return the value."""
         return self.raw_value
+
+
+class EtaReadDurationSensor(CoordinatorEntity[EtaCoordinator], SensorEntity):
+    """How long reading all enabled values took, to help choose the interval."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "read_duration"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_device_class = SensorDeviceClass.DURATION
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = UnitOfTime.SECONDS
+    _attr_suggested_display_precision = 1
+
+    def __init__(self, coordinator: EtaCoordinator) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{coordinator.config_entry.entry_id}_read_duration"
+        self._attr_device_info = device_info(coordinator.config_entry)
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the duration of the last successful read."""
+        return self.coordinator.last_read_duration

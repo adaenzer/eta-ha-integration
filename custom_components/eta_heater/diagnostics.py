@@ -19,6 +19,7 @@ async def async_get_config_entry_diagnostics(
     """Return diagnostics for a config entry."""
     coordinator = entry.runtime_data
     data = coordinator.data or {}
+    selected = {e.key for e in coordinator.selected_entries()}
     return {
         "data": async_redact_data(dict(entry.data), TO_REDACT),
         "options": dict(entry.options),
@@ -29,6 +30,8 @@ async def async_get_config_entry_diagnostics(
                 "index": e.index,
                 "value_type": e.value_type,
                 "divider": e.divider,
+                "level": e.level,
+                "read": e.key in selected,
                 "header": list(e.header),
                 "value": data.get(e.key),
             }

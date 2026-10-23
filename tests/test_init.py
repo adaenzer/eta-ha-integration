@@ -204,8 +204,71 @@ async def test_unload_and_diagnostics(
     diagnostics = await async_get_config_entry_diagnostics(hass, serial_entry)
     assert diagnostics["monitor_list"][0]["name"] == "Kesseltemperatur"
     assert diagnostics["monitor_list"][0]["value"] == 65.2
+    assert diagnostics["monitor_list"][0]["level"] == 0
+    assert diagnostics["monitor_list"][0]["read"] is True
 
     unsubscribes = len(heater.requests_of("ME"))
     assert await hass.config_entries.async_unload(serial_entry.entry_id)
     assert serial_entry.state is ConfigEntryState.NOT_LOADED
     assert len(heater.requests_of("ME")) == unsubscribes + 1
+
+
+def _requested_keys(heater: FakeHeater) -> set[tuple[int, int]]:
+    keys = set()
+    for frame in heater.requests_of("MC"):
+        for pos in range(1, len(frame.payload), 3):
+            node, hb, lb = frame.payload[pos : pos + 3]
+            keys.add((node, hb * 256 + lb))
+    return keys
+
+
+async def test_value_selection(hass: HomeAssistant, heater: FakeHeater) -> None:
+    """Only enabled entities are read; deeper levels start disabled."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"connection": "serial", "device": "/dev/ttyUSB0", "baudrate": 19200},
+        options={CONF_LEVELS: [0, 1]},
+    )
+    await _setup(hass, entry)
+    registry = er.async_get(hass)
+    deep = _entity_id(hass, entry, 9, 300)
+    assert registry.async_get(deep).disabled_by is er.RegistryEntryDisabler.INTEGRATION
+    assert (9, 300) not in _requested_keys(heater)
+    assert (8, 1) in _requested_keys(heater)
+
+    # Disabling an entity stops reading it
+    temp = _entity_id(hass, entry, 8, 1)
+    registry.async_update_entity(temp, disabled_by=er.RegistryEntryDisabler.USER)
+    heater.requests.clear()
+    await entry.runtime_data.async_refresh()
+    assert (8, 1) not in _requested_keys(heater)
+
+    # Enabling an entity reads it after the entry was reloaded
+    registry.async_update_entity(deep, disabled_by=None)
+    await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert (9, 300) in _requested_keys(heater)
+    assert hass.states.get(deep).state == "40.0"
+
+    # Nothing enabled: nothing is read and setup still works
+    for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
+        registry.async_update_entity(
+            entity.entity_id, disabled_by=er.RegistryEntryDisabler.USER
+        )
+    heater.requests.clear()
+    await entry.runtime_data.async_refresh()
+    assert not heater.requests_of("MC")
+    assert entry.runtime_data.last_update_success
+
+
+async def test_read_duration(
+    hass: HomeAssistant, heater: FakeHeater, serial_entry: MockConfigEntry
+) -> None:
+    """The time a full read takes is shown as a diagnostic sensor."""
+    await _setup(hass, serial_entry)
+    entity_id = er.async_get(hass).async_get_entity_id(
+        "sensor", DOMAIN, f"{serial_entry.entry_id}_read_duration"
+    )
+    state = hass.states.get(entity_id)
+    assert float(state.state) >= 0
+    assert state.attributes["unit_of_measurement"] == "s"
