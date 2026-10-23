@@ -196,13 +196,14 @@ async def test_errors(
     event = er.async_get(hass).async_get_entity_id(
         "event", DOMAIN, f"{ptvo_entry.entry_id}_error"
     )
-    heater.send_error("IM", "Saugzug blockiert")
+    heater.send_error("IM", "Saugzug block-\niert\nbitte prüfen")
     await hass.async_block_till_done()
 
     state = hass.states.get(event)
     assert state.attributes["event_type"] == "error"
     assert state.attributes["error_type"] == "IM"
-    assert state.attributes["message"] == "Saugzug blockiert"
+    assert state.attributes["message"] == "Saugzug blockiert bitte prüfen"
+    assert state.attributes["raw_message"] == "Saugzug block-\niert\nbitte prüfen"
 
     published = [
         json.loads(payload)
@@ -211,7 +212,7 @@ async def test_errors(
     ]
     assert len(published) == 1
     assert published[0]["ErrorType"] == "IM"
-    assert published[0]["ErrorText"] == "Saugzug blockiert"
+    assert published[0]["ErrorText"] == "Saugzug blockiert bitte prüfen"
     assert len(published[0]["time"]) == 21
 
 

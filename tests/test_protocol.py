@@ -13,6 +13,7 @@ from custom_components.eta_heater.protocol import (
     MonitorEntry,
     build_frame,
     build_monitor_list,
+    clean_display_text,
     parse_monitor_entry,
     parse_values,
     subscribe_request,
@@ -183,3 +184,14 @@ def test_unit_from_name(name: str, unit: str | None) -> None:
 def test_strip_unit(name: str, expected: str) -> None:
     """Units in brackets are removed from names, other text is kept."""
     assert strip_unit(name) == expected
+
+
+def test_clean_display_text() -> None:
+    """Display lines are joined, hyphenated words put together again."""
+    text = "** FEHLER ** \nAustragung 0\nWartungsdeckel Fall-\nschacht offen!\n(16:44:12 23.10.26)"
+    assert clean_display_text(text) == (
+        "** FEHLER ** Austragung 0 Wartungsdeckel Fallschacht offen! (16:44:12 23.10.26)"
+    )
+    # a hyphen before an upper case word is kept, e.g. "Pellets-" "Austragung"
+    assert clean_display_text("Pellets-\nAustragung") == "Pellets- Austragung"
+    assert clean_display_text("one line") == "one line"
