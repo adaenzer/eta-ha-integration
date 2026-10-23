@@ -36,6 +36,7 @@ CONF_BAUDRATE: Final = "baudrate"
 
 CONF_LEVELS: Final = "levels"
 CONF_PUBLISH_ERRORS: Final = "publish_errors"
+CONF_ALLOW_COMMANDS: Final = "allow_commands"
 
 DEFAULT_TOPIC: Final = "zigbee2mqtt/heater"
 DEFAULT_MQTT_PORT: Final = 1883
@@ -48,6 +49,30 @@ ERROR_TOPIC_SUFFIX: Final = "/error"
 EVENT_TYPE_ERROR: Final = "error"
 
 STORAGE_VERSION: Final = 1
+
+
+@dataclass(frozen=True, slots=True)
+class HeaterCommand:
+    """A remote control command of the heater (service IH, Data[0])."""
+
+    key: str
+    code: int
+    # The heating commands only act on heating circuits that allow SMS
+    # control ("SMS erlauben"); controllers without circuits ignore them
+    enabled_by_default: bool
+
+
+# From the ETA protocol description ("Heizung über SMS umschalten") and the
+# GSM connector manual
+HEATER_COMMANDS: Final = (
+    HeaterCommand("boiler_on", 0x10, True),
+    HeaterCommand("boiler_off", 0x20, True),
+    HeaterCommand("load_hot_water", 0x40, True),
+    HeaterCommand("heating_auto", 0x02, False),
+    HeaterCommand("heating_day", 0x04, False),
+    HeaterCommand("heating_night", 0x08, False),
+    HeaterCommand("heating_switch", 0x01, False),
+)
 
 
 @dataclass(frozen=True, slots=True)

@@ -104,6 +104,25 @@ monitor list read from the heater, once.
 
 Connection settings can be changed later with **Reconfigure**.
 
+## Commands (experimental, branch `feature/ih-commands`)
+
+With the option **Allow commands** (off by default), the device gets buttons
+that send the remote control commands ETA's GSM connector sends for SMS
+("Heizung über SMS umschalten", service `IH`):
+
+| Button | Data[0] | Notes |
+|---|---|---|
+| Boiler on / Kessel ein | 0x10 | |
+| Boiler off / Kessel aus | 0x20 | |
+| Load hot water now / Boiler jetzt laden | 0x40 | |
+| Heating auto / day / night | 0x02 / 0x04 / 0x08 | Created disabled. Only acts on heating circuits with "SMS erlauben" = yes |
+| Heating per switch | 0x01 | Created disabled. Hands control back to the physical switch |
+
+The controller does not confirm these commands in a documented way; the
+values are read right after a command, and its effect shows in them (e.g. the
+boiler state). Errors cannot be acknowledged this way, and simulating the
+display's keys is not supported.
+
 ## How data is updated
 
 Right after setup, the integration reads the monitor list of the selected

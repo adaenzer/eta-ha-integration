@@ -15,6 +15,7 @@ from custom_components.eta_heater.protocol import (
     build_monitor_list,
     parse_monitor_entry,
     parse_values,
+    sms_command_request,
     subscribe_request,
     to_signed,
 )
@@ -183,3 +184,9 @@ def test_unit_from_name(name: str, unit: str | None) -> None:
 def test_strip_unit(name: str, expected: str) -> None:
     """Units in brackets are removed from names, other text is kept."""
     assert strip_unit(name) == expected
+
+
+def test_sms_command_request() -> None:
+    """Commands use service IH with the command in the first data byte."""
+    # as documented in the Symcon thread for "Kessel Ein"
+    assert sms_command_request(0x10) == bytes.fromhex("7B 49 48 02 10 10 00 7D")

@@ -42,6 +42,7 @@ from .const import (
     AVAILABLE_LEVELS,
     BROKER_EXTERNAL,
     BROKER_HOME_ASSISTANT,
+    CONF_ALLOW_COMMANDS,
     CONF_BAUDRATE,
     CONF_BROKER,
     CONF_CONNECTION,
@@ -378,6 +379,11 @@ class EtaOptionsFlow(OptionsFlowWithReload):
                     CONF_PUBLISH_ERRORS, default=options.get(CONF_PUBLISH_ERRORS, True)
                 )
             ] = BooleanSelector()
+        schema[
+            vol.Required(
+                CONF_ALLOW_COMMANDS, default=options.get(CONF_ALLOW_COMMANDS, False)
+            )
+        ] = BooleanSelector()
         return self.async_show_form(
             step_id="init", data_schema=vol.Schema(schema), errors=errors
         )

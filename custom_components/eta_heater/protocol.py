@@ -38,6 +38,9 @@ SERVICE_UNSUBSCRIBE = "ME"
 SERVICE_PARAMETER_INDEX = "MF"  # -> Mg
 SERVICE_PARAMETER_INDEX_ENTRY = "Mg"
 SERVICE_STOP = "MO"  # stops any list transfer in progress
+# Remote control as used by ETA's GSM connector ("Heizung über SMS
+# umschalten"): Data[0] selects the command, Data[1] is 0
+SERVICE_SMS_COMMAND = "IH"
 
 ERROR_SERVICES = frozenset({"IM", "SE", "SS"})
 FRAME_STARTS = (b"{I", b"{M", b"{P", b"{S")
@@ -314,6 +317,11 @@ def parse_values(payload: bytes) -> dict[tuple[int, int], int] | None:
         node, idx_hb, idx_lb, val_hb, val_lb = payload[pos : pos + VALUE_RECORD_LEN]
         values[(node, idx_hb * 256 + idx_lb)] = val_hb * 256 + val_lb
     return values
+
+
+def sms_command_request(code: int) -> bytes:
+    """Build a remote control command, e.g. 0x10 to switch the boiler on."""
+    return build_frame(SERVICE_SMS_COMMAND, bytes([code, 0]))
 
 
 def monitor_list_request(position: int, level: int) -> bytes:

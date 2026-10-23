@@ -77,12 +77,14 @@
         "data": {
           "levels": "Ebenen der Monitorliste",
           "scan_interval": "Aktualisierungsintervall",
-          "publish_errors": "Störmeldungen über MQTT senden"
+          "publish_errors": "Störmeldungen über MQTT senden",
+          "allow_commands": "Befehle erlauben"
         },
         "data_description": {
           "levels": "Ebenen 0 bis 3 der Monitorliste der Heizung. Eine Änderung wirkt erst, wenn am Gerät Monitorliste neu einlesen gedrückt wird, da das Einlesen einige Minuten dauert.",
           "scan_interval": "Wie oft die aktivierten Werte von der Heizung gelesen werden. Der Diagnosesensor Lesedauer zeigt, wie lange ein Lesevorgang dauert; nicht benötigte Entitäten zu deaktivieren verkürzt ihn.",
-          "publish_errors": "Störmeldungen zusätzlich als JSON an das zigbee2mqtt-Topic mit angehängtem /error senden, wie die bisherige AppDaemon-App."
+          "publish_errors": "Störmeldungen zusätzlich als JSON an das zigbee2mqtt-Topic mit angehängtem /error senden, wie die bisherige AppDaemon-App.",
+          "allow_commands": "Fügt Tasten hinzu, um den Kessel ein- und auszuschalten und den Boiler jetzt zu laden, gesendet wie die SMS-Befehle des ETA GSM-Connectors. Befehle für Heizkreise wirken nur auf Heizkreise mit „SMS erlauben“ = Ja; sie werden deaktiviert angelegt."
         }
       }
     },
@@ -105,6 +107,27 @@
       },
       "reset_monitor_list": {
         "name": "Monitorliste zurücksetzen und neu einlesen"
+      },
+      "boiler_on": {
+        "name": "Kessel ein"
+      },
+      "boiler_off": {
+        "name": "Kessel aus"
+      },
+      "load_hot_water": {
+        "name": "Boiler jetzt laden"
+      },
+      "heating_auto": {
+        "name": "Heizung Auto"
+      },
+      "heating_day": {
+        "name": "Heizung Tag"
+      },
+      "heating_night": {
+        "name": "Heizung Nacht"
+      },
+      "heating_switch": {
+        "name": "Heizung nach Schalter"
       }
     },
     "event": {
@@ -190,6 +213,12 @@
     },
     "reread_in_progress": {
       "message": "Die Monitorliste wird bereits eingelesen"
+    },
+    "busy_reading_list": {
+      "message": "Die Monitorliste wird gerade eingelesen, bitte danach erneut versuchen"
+    },
+    "command_failed": {
+      "message": "Senden des Befehls fehlgeschlagen: {error}"
     }
   },
   "issues": {

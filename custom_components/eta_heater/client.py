@@ -28,6 +28,7 @@ from .protocol import (
     monitor_list_request,
     parse_monitor_entry,
     parse_values,
+    sms_command_request,
     subscribe_request,
 )
 from .transport import Transport
@@ -165,6 +166,17 @@ class EtaClient:
                 await asyncio.sleep(LATE_ANSWER_TIME)
             return frame
         raise EtaTimeoutError(f"No {response_service} answer from heater")
+
+    async def async_send_command(self, code: int) -> None:
+        """Send a remote control command (service IH).
+
+        The controller executes it like an SMS command of ETA's GSM
+        connector. It does not answer in a documented way, so the effect
+        shows in the values (e.g. the boiler state) only.
+        """
+        async with self._lock:
+            _LOGGER.info("Sending command 0x%02x to the heater", code)
+            await self._async_send(sms_command_request(code))
 
     async def async_probe(self) -> None:
         """Check that the heater answers; raises EtaError if it does not."""

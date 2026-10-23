@@ -6,6 +6,27 @@
       },
       "reset_monitor_list": {
         "default": "mdi:playlist-remove"
+      },
+      "boiler_on": {
+        "default": "mdi:fire"
+      },
+      "boiler_off": {
+        "default": "mdi:fire-off"
+      },
+      "load_hot_water": {
+        "default": "mdi:water-boiler"
+      },
+      "heating_auto": {
+        "default": "mdi:radiator"
+      },
+      "heating_day": {
+        "default": "mdi:white-balance-sunny"
+      },
+      "heating_night": {
+        "default": "mdi:weather-night"
+      },
+      "heating_switch": {
+        "default": "mdi:radiator-disabled"
       }
     },
     "event": {

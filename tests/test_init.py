@@ -461,3 +461,53 @@ async def test_read_again_merges_reset_replaces(
     await _press_reread(hass, serial_entry, "reset_monitor_list")
     coordinator = serial_entry.runtime_data
     assert {e.key for e in coordinator.monitor_list} == keys - {(8, 4)}
+
+
+async def test_commands(hass: HomeAssistant, heater: FakeHeater) -> None:
+    """Command buttons exist only when allowed and send IH frames."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"connection": "serial", "device": "/dev/ttyUSB0", "baudrate": 19200},
+        options={"allow_commands": True},
+    )
+    await _setup(hass, entry)
+    registry = er.async_get(hass)
+
+    def button(key: str) -> str | None:
+        return registry.async_get_entity_id("button", DOMAIN, f"{entry.entry_id}_{key}")
+
+    assert registry.async_get(button("heating_day")).disabled
+    assert not registry.async_get(button("boiler_off")).disabled
+
+    heater.requests.clear()
+    await hass.services.async_call(
+        BUTTON_DOMAIN,
+        SERVICE_PRESS,
+        {ATTR_ENTITY_ID: button("boiler_off")},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+    commands = heater.requests_of("IH")
+    assert [c.payload for c in commands] == [bytes([0x20, 0])]
+    # the values are read right after to show the effect
+    assert heater.requests_of("MC")
+
+    entry.runtime_data.rereading = True
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(
+            BUTTON_DOMAIN,
+            SERVICE_PRESS,
+            {ATTR_ENTITY_ID: button("load_hot_water")},
+            blocking=True,
+        )
+    assert len(heater.requests_of("IH")) == 1
+
+
+async def test_no_command_buttons_by_default(
+    hass: HomeAssistant, heater: FakeHeater, serial_entry: MockConfigEntry
+) -> None:
+    """Without the option, no command buttons are created."""
+    await _setup(hass, serial_entry)
+    assert not er.async_get(hass).async_get_entity_id(
+        "button", DOMAIN, f"{serial_entry.entry_id}_boiler_on"
+    )

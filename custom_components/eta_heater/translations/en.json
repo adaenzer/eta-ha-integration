@@ -77,12 +77,14 @@
         "data": {
           "levels": "Monitor list levels",
           "scan_interval": "Update interval",
-          "publish_errors": "Publish errors to MQTT"
+          "publish_errors": "Publish errors to MQTT",
+          "allow_commands": "Allow commands"
         },
         "data_description": {
           "levels": "Levels 0 to 3 of the heater's monitor list. A change only takes effect when you press Read monitor list again on the device, because reading the list takes several minutes.",
           "scan_interval": "How often the enabled values are read from the heater. The diagnostic sensor Read duration shows how long one read takes; disabling entities you do not need makes it shorter.",
-          "publish_errors": "Also publish error messages as JSON to the zigbee2mqtt topic followed by /error, like the former AppDaemon app."
+          "publish_errors": "Also publish error messages as JSON to the zigbee2mqtt topic followed by /error, like the former AppDaemon app.",
+          "allow_commands": "Adds buttons to switch the boiler on and off and to load hot water now, sent like the SMS commands of ETA's GSM connector. Commands for heating circuits only act on circuits with \"SMS erlauben\" set to yes; they are created disabled."
         }
       }
     },
@@ -105,6 +107,27 @@
       },
       "reset_monitor_list": {
         "name": "Reset and read monitor list"
+      },
+      "boiler_on": {
+        "name": "Boiler on"
+      },
+      "boiler_off": {
+        "name": "Boiler off"
+      },
+      "load_hot_water": {
+        "name": "Load hot water now"
+      },
+      "heating_auto": {
+        "name": "Heating auto"
+      },
+      "heating_day": {
+        "name": "Heating day"
+      },
+      "heating_night": {
+        "name": "Heating night"
+      },
+      "heating_switch": {
+        "name": "Heating per switch"
       }
     },
     "event": {
@@ -190,6 +213,12 @@
     },
     "reread_in_progress": {
       "message": "The monitor list is already being read"
+    },
+    "busy_reading_list": {
+      "message": "The monitor list is being read, try again when it is done"
+    },
+    "command_failed": {
+      "message": "Sending the command failed: {error}"
     }
   },
   "issues": {

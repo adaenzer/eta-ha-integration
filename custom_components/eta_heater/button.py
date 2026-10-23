@@ -1,4 +1,4 @@
-"""Buttons to read the monitor list of the ETA heater."""
+"""Buttons of the ETA heater: read the monitor list, send commands."""
 
 from __future__ import annotations
 
@@ -8,9 +8,11 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import DOMAIN
+from .client import EtaError
+from .const import CONF_ALLOW_COMMANDS, DOMAIN, HEATER_COMMANDS, HeaterCommand
 from .coordinator import EtaConfigEntry
 from .entity import device_info
+from .transport import TransportError
 
 PARALLEL_UPDATES = 0
 
@@ -21,12 +23,13 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up the buttons."""
-    async_add_entities(
-        [
-            EtaMonitorListButton(entry, "reread_monitor_list", reset=False),
-            EtaMonitorListButton(entry, "reset_monitor_list", reset=True),
-        ]
-    )
+    buttons: list[ButtonEntity] = [
+        EtaMonitorListButton(entry, "reread_monitor_list", reset=False),
+        EtaMonitorListButton(entry, "reset_monitor_list", reset=True),
+    ]
+    if entry.options.get(CONF_ALLOW_COMMANDS, False):
+        buttons += [EtaCommandButton(entry, command) for command in HEATER_COMMANDS]
+    async_add_entities(buttons)
 
 
 class EtaMonitorListButton(ButtonEntity):
@@ -61,3 +64,38 @@ class EtaMonitorListButton(ButtonEntity):
             coordinator.async_reread_monitor_list(reset=self._reset),
             "eta_heater_read_monitor_list",
         )
+
+
+class EtaCommandButton(ButtonEntity):
+    """Send a remote control command, like ETA's GSM connector does by SMS."""
+
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+
+    def __init__(self, entry: EtaConfigEntry, command: HeaterCommand) -> None:
+        """Initialize the button."""
+        self._entry = entry
+        self._command = command
+        self._attr_translation_key = command.key
+        self._attr_unique_id = f"{entry.entry_id}_{command.key}"
+        self._attr_entity_registry_enabled_default = command.enabled_by_default
+        self._attr_device_info = device_info(entry)
+
+    async def async_press(self) -> None:
+        """Send the command and read the values to show its effect."""
+        coordinator = self._entry.runtime_data
+        if coordinator.rereading:
+            # The list read holds the line for minutes; refuse instead of
+            # sending the command at some unknown later time
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="busy_reading_list"
+            )
+        try:
+            await coordinator.client.async_send_command(self._command.code)
+        except (EtaError, TransportError) as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="command_failed",
+                translation_placeholders={"error": str(err)},
+            ) from err
+        await coordinator.async_request_refresh()

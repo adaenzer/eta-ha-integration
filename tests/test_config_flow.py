@@ -234,6 +234,7 @@ async def test_options(hass: HomeAssistant, ptvo_entry: MockConfigEntry) -> None
         CONF_LEVELS: [0, 2],
         CONF_SCAN_INTERVAL: 60,
         CONF_PUBLISH_ERRORS: False,
+        "allow_commands": False,
     }
 
 
