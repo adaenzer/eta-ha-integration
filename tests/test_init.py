@@ -95,7 +95,7 @@ async def test_monitor_list_cached(
     """The list is read on the first setup only; level changes need the button."""
     await _setup(hass, serial_entry)
     requests = len(heater.requests_of("MA"))
-    assert requests == len(heater.monitor_list[0]) + 3
+    assert requests == len(heater.monitor_list[0]) + 1
 
     await hass.config_entries.async_reload(serial_entry.entry_id)
     await hass.async_block_till_done()
@@ -115,9 +115,11 @@ async def test_monitor_list_cached(
     assert not issues.async_get_issue(DOMAIN, issue_id)
 
 
-async def _press_reread(hass: HomeAssistant, entry: MockConfigEntry) -> None:
+async def _press_reread(
+    hass: HomeAssistant, entry: MockConfigEntry, key: str = "reread_monitor_list"
+) -> None:
     button = er.async_get(hass).async_get_entity_id(
-        "button", DOMAIN, f"{entry.entry_id}_reread_monitor_list"
+        "button", DOMAIN, f"{entry.entry_id}_{key}"
     )
     await hass.services.async_call(
         BUTTON_DOMAIN, SERVICE_PRESS, {ATTR_ENTITY_ID: button}, blocking=True
@@ -434,3 +436,23 @@ async def test_names_and_attributes(hass: HomeAssistant, heater: FakeHeater) -> 
     assert ash.attributes["section"] == "BEDIENEINHEIT"
 
     assert state(40, 19).state == "1.5"  # 1500 mA with divider 1000
+
+
+async def test_read_again_merges_reset_replaces(
+    hass: HomeAssistant, heater: FakeHeater, serial_entry: MockConfigEntry
+) -> None:
+    """Reading again keeps values the read missed; reset starts over."""
+    await _setup(hass, serial_entry)
+    coordinator = serial_entry.runtime_data
+    keys = {e.key for e in coordinator.monitor_list}
+    assert (8, 4) in keys
+
+    # The value is not received this time (e.g. lost transmission)
+    del heater.monitor_list[0][4]
+    await _press_reread(hass, serial_entry)
+    coordinator = serial_entry.runtime_data
+    assert {e.key for e in coordinator.monitor_list} == keys
+
+    await _press_reread(hass, serial_entry, "reset_monitor_list")
+    coordinator = serial_entry.runtime_data
+    assert {e.key for e in coordinator.monitor_list} == keys - {(8, 4)}

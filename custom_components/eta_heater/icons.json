@@ -3,6 +3,9 @@
     "button": {
       "reread_monitor_list": {
         "default": "mdi:format-list-bulleted"
+      },
+      "reset_monitor_list": {
+        "default": "mdi:playlist-remove"
       }
     },
     "event": {

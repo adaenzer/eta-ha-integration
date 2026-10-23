@@ -112,8 +112,16 @@ Zigbee; until it is done, the device only shows the button, the error event
 and the read duration sensor. The value entities appear once the list was
 read. If reading fails, a repair notice says so and the button starts a new
 attempt. The list is
-cached and only read again when you press **Read monitor list again** on the
-device. Changing the levels in the options does not read the list; a repair
+cached and only read again when you press one of the buttons on the device:
+
+- **Read monitor list again (fill gaps)** reads the list and merges it into
+  the cached one: values read again are updated, values missing so far are
+  added, nothing is removed. Over a flaky Zigbee connection a read can miss
+  entries; reading again fills such gaps.
+- **Reset and read monitor list** starts over with an empty list, e.g. after
+  the heater's configuration changed. Entities of values that are no longer
+  listed stay in Home Assistant as "not provided" and can be deleted there.
+ Changing the levels in the options does not read the list; a repair
 notice reminds you to press the button. While the list is read, the current
 values stay available; if reading fails, the previous list is kept.
 
@@ -129,12 +137,12 @@ The controller is easily overloaded, so the integration is strict:
   read, no values are read; the last values stay shown.
 - A new request is only sent after the previous one was answered. A request
   without an answer counts as lost after 30 seconds (over Zigbee, answers
-  sometimes stall for 10-25 seconds); only then is it sent again (monitor
-  list entries, up to three times) or the read is stopped (values: no further
-  groups are requested).
-- Where the controller is known to be inconsistent (start and end of a level,
-  answers to a repeated request), a monitor list entry is only accepted once
-  the same answer came twice in a row.
+  sometimes stall for 10-25 seconds and then arrive in a batch).
+- For the monitor list, the controller keeps its own cursor: each request
+  returns the next entry, whatever position it asks for. So entries are
+  collected in the order they arrive instead of being matched to requests,
+  and a lost answer only leaves a gap (three lost answers in a row stop the
+  read). Values: a group without answer stops the read of further groups.
 - At least 0.5 seconds pass between two frames sent to the heater.
 - Every value subscription is stopped again (`ME`), also after errors, and
   before the monitor list is read.

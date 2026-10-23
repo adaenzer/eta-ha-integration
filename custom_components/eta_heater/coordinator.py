@@ -23,7 +23,7 @@ from .const import (
     STORAGE_VERSION,
     value_type_for,
 )
-from .protocol import MonitorEntry, build_monitor_list
+from .protocol import MonitorEntry, build_monitor_list, merge_monitor_lists
 from .transport import TransportError
 
 _LOGGER = logging.getLogger(__name__)
@@ -116,8 +116,12 @@ class EtaCoordinator(DataUpdateCoordinator[EtaData]):
             "eta_heater_read_monitor_list",
         )
 
-    async def _async_read_monitor_list(self) -> None:
-        """Read the monitor list of the configured levels and cache it."""
+    async def _async_read_monitor_list(self, reset: bool = False) -> None:
+        """Read the monitor list of the configured levels and cache it.
+
+        Unless reset, the read is merged into the cached list: entries read
+        again are updated and missing ones added, nothing is removed.
+        """
         levels = self.levels
         _LOGGER.info("Reading monitor list levels %s from the heater", levels)
         monitor_list = build_monitor_list(
@@ -126,22 +130,28 @@ class EtaCoordinator(DataUpdateCoordinator[EtaData]):
         )
         if not monitor_list:
             raise MonitorListEmptyError("The heater returned an empty monitor list")
+        if not reset:
+            added = len(
+                {e.key for e in monitor_list} - {e.key for e in self.monitor_list}
+            )
+            monitor_list = merge_monitor_lists(self.monitor_list, monitor_list)
+            _LOGGER.info("Monitor list read, %d new values", added)
         await self._store.async_save(
             {CONF_LEVELS: levels, "entries": [e.as_dict() for e in monitor_list]}
         )
         self.list_levels = levels
         self.monitor_list = monitor_list
 
-    async def async_reread_monitor_list(self) -> None:
+    async def async_reread_monitor_list(self, reset: bool = False) -> None:
         """Read the monitor list (again) and reload the entry to apply it.
 
-        Values keep being shown from the previous list while reading; if
-        reading fails, the previous list stays in use.
+        Without reset the read is merged into the current list. Values keep
+        being shown while reading; if reading fails, the list stays as it is.
         """
         self.rereading = True
         issue_id = monitor_list_issue_id(self.config_entry.entry_id)
         try:
-            await self._async_read_monitor_list()
+            await self._async_read_monitor_list(reset)
         except (EtaError, TransportError) as err:
             self._async_check_other_program()
             error = str(err) or type(err).__name__

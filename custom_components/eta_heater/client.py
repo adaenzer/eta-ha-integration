@@ -3,8 +3,8 @@
 The controller is easily overloaded, so communication follows strict rules:
 
 - Only one operation (probe, monitor list read, value read) runs at a time.
-- A request is only sent when the previous one was answered or given up.
-  A request without answer is only repeated after RESPONSE_TIMEOUT.
+- A request is only sent when the previous one was answered or given up
+  after RESPONSE_TIMEOUT.
 - There is a pause of at least FRAME_GAP between any two frames sent.
 - Value subscriptions are always stopped again, also when something fails.
 """
@@ -37,25 +37,22 @@ _LOGGER = logging.getLogger(__name__)
 # Minimum time between two frames sent to the heater
 FRAME_GAP = 0.5
 # How long to wait for an answer before a request counts as lost. Over Zigbee
-# the answers sometimes stall for 10-25 s and then arrive in a batch; asking
-# again too early makes the controller answer with the following entry.
+# the answers sometimes stall for 10-25 s and then arrive in a batch.
 RESPONSE_TIMEOUT = 30.0
-# Attempts per monitor list entry; a lost request is repeated, never earlier
-# than RESPONSE_TIMEOUT after it was sent
-MONITOR_LIST_ATTEMPTS = 3
 # After a repeated request was answered, wait this long so that a late answer
 # to the lost request is not taken as the answer to the next one
 LATE_ANSWER_TIME = 2.0
-# How long to wait for a second answer at the start of a level and when the
-# end of a level is reached, see _async_request_entry
+# Lost answers in a row after which reading a monitor list level is given up
+MONITOR_LIST_MAX_LOST = 3
+# After "end of list", wait this long for late entries before ending a level
 LEVEL_SETTLE_TIME = 1.5
-# How often a position is asked again to get the same answer twice
-MAX_CONFIRMATIONS = 4
+# Requests per level at most (the heater's lists have up to about 200 entries)
+MAX_LEVEL_REQUESTS = 400
 VALUES_TIMEOUT = 30.0
 # Once the first values of a group arrived, wait this long for the rest
 MORE_VALUES_TIME = 1.0
 DISCONNECT_TIMEOUT = 30.0
-MAX_MONITOR_ENTRIES = 256  # the list position is a single byte
+MAX_POSITION = 255  # the list position is a single byte
 # Refresh interval requested from the heater while reading values. Each group
 # is unsubscribed before it repeats, so this only needs to exceed the timeout.
 SUBSCRIBE_REFRESH_S = 30
@@ -82,6 +79,7 @@ class EtaClient:
         self._last_send = 0.0
         self._waiters: dict[str, asyncio.Future[Frame]] = {}
         self._value_queue: asyncio.Queue[dict[tuple[int, int], int]] | None = None
+        self._list_queue: asyncio.Queue[Frame] | None = None
         self._error_listeners: list[ErrorListener] = []
         # Values this client ever subscribed to; value frames with none of
         # them were requested by another program talking to the heater
@@ -133,6 +131,9 @@ class EtaClient:
             if self._value_queue is not None:
                 self._value_queue.put_nowait(values)
             return
+        if frame.service == SERVICE_MONITOR_LIST_ENTRY and self._list_queue is not None:
+            self._list_queue.put_nowait(frame)
+            return
         if (waiter := self._waiters.pop(frame.service, None)) and not waiter.done():
             waiter.set_result(frame)
             return
@@ -141,16 +142,7 @@ class EtaClient:
     async def _async_request(
         self, request: bytes, response_service: str, attempts: int = 1
     ) -> Frame:
-        """Send a request and wait for its answer."""
-        frame, _ = await self._async_request_counted(
-            request, response_service, attempts
-        )
-        return frame
-
-    async def _async_request_counted(
-        self, request: bytes, response_service: str, attempts: int = 1
-    ) -> tuple[Frame, int]:
-        """Send a request; return its answer and how often it was sent.
+        """Send a request and wait for its answer.
 
         The request is only repeated after the previous attempt timed out.
         """
@@ -171,7 +163,7 @@ class EtaClient:
                 # A late answer to a lost attempt is dropped while no request
                 # is waiting for it
                 await asyncio.sleep(LATE_ANSWER_TIME)
-            return frame, attempt
+            return frame
         raise EtaTimeoutError(f"No {response_service} answer from heater")
 
     async def async_probe(self) -> None:
@@ -183,86 +175,111 @@ class EtaClient:
                 monitor_list_request(0, 0), SERVICE_MONITOR_LIST_ENTRY
             )
 
-    async def _async_request_entry(
-        self, position: int, level: int
-    ) -> MonitorEntry | None:
-        """Request one monitor list entry; None at the end of the list.
-
-        The controller is not always consistent, so in three situations the
-        answer is only accepted once the same answer came twice in a row:
-
-        - At the start of a level it first answers "end of list" and sends
-          the actual entry a moment later.
-        - After a request had to be repeated, it sometimes answers with the
-          entry after the requested one.
-        - An "end of list" must not end the level by mistake.
-
-        Like in the original AppDaemon implementation; but other positions
-        are only requested once, which keeps the read fast.
-        """
-        service = SERVICE_MONITOR_LIST_ENTRY
-        request = monitor_list_request(position, level)
-        frame, attempts = await self._async_request_counted(
-            request, service, MONITOR_LIST_ATTEMPTS
-        )
-        if position == 0:
-            frame = await self._async_last_answer(service, frame)
-        if attempts == 1 and position != 0 and frame.payload:
-            return parse_monitor_entry(frame.payload, level)
-        for _ in range(MAX_CONFIRMATIONS):
-            again, _ = await self._async_request_counted(
-                request, service, MONITOR_LIST_ATTEMPTS
-            )
-            again = await self._async_last_answer(service, again)
-            if again.payload == frame.payload:
-                break
-            _LOGGER.debug(
-                "Level %d position %d answered differently, asking again",
-                level,
-                position,
-            )
-            frame = again
-        else:
-            _LOGGER.warning(
-                "Level %d position %d gave no consistent answer", level, position
-            )
-        return parse_monitor_entry(frame.payload, level)
-
-    async def _async_last_answer(self, service: str, frame: Frame) -> Frame:
-        """Return the last answer arriving within LEVEL_SETTLE_TIME."""
-        loop = asyncio.get_running_loop()
-        deadline = loop.time() + LEVEL_SETTLE_TIME
-        while True:
-            waiter = loop.create_future()
-            self._waiters[service] = waiter
-            try:
-                async with asyncio.timeout_at(deadline):
-                    frame = await waiter
-            except TimeoutError:
-                return frame
-            finally:
-                self._waiters.pop(service, None)
-
     async def async_read_monitor_list(self, levels: list[int]) -> list[MonitorEntry]:
         """Read the monitor list for the given levels, as the heater sends it.
 
         Levels are read in ascending order. The result includes headings and
-        duplicates; see protocol.build_monitor_list.
+        may lack entries whose transmission got lost; reading again and
+        merging the results fills such gaps (see protocol.merge_monitor_lists).
         """
         entries: list[MonitorEntry] = []
         async with self._lock:
-            await self._async_send(build_frame(SERVICE_UNSUBSCRIBE))
-            await self._async_send(build_frame(SERVICE_STOP))
-            for level in sorted(levels):
-                for position in range(MAX_MONITOR_ENTRIES):
-                    if (
-                        entry := await self._async_request_entry(position, level)
-                    ) is None:
-                        break
-                    entries.append(entry)
-            await self._async_send(build_frame(SERVICE_STOP))
+            self._list_queue = asyncio.Queue()
+            try:
+                await self._async_send(build_frame(SERVICE_UNSUBSCRIBE))
+                await self._async_send(build_frame(SERVICE_STOP))
+                for level in sorted(levels):
+                    entries += await self._async_read_level(level)
+                await self._async_send(build_frame(SERVICE_STOP))
+            finally:
+                self._list_queue = None
         _LOGGER.debug("Read %d monitor list entries", len(entries))
         return entries
+
+    async def _async_read_level(self, level: int) -> list[MonitorEntry]:
+        """Read one level of the monitor list.
+
+        The controller does not reliably answer the requested position: it
+        keeps a cursor and answers each request with the next entry, and over
+        Zigbee answers can be late, come in batches or get lost. So answers
+        are not matched to requests. Position 0 starts the level, each
+        further request asks for the next entry, and every entry arriving is
+        kept in arrival order. A request is only sent when no request is
+        waiting for its answer, or after RESPONSE_TIMEOUT.
+        """
+        assert self._list_queue is not None
+        queue = self._list_queue
+        entries: list[MonitorEntry] = []
+        position = 0
+        restarted = False
+        lost = 0
+        await self._async_send(monitor_list_request(position, level))
+        for _ in range(MAX_LEVEL_REQUESTS):
+            try:
+                async with asyncio.timeout(RESPONSE_TIMEOUT):
+                    frames = [await queue.get()]
+            except TimeoutError:
+                lost += 1
+                if lost >= MONITOR_LIST_MAX_LOST:
+                    raise EtaTimeoutError(
+                        f"No monitor list answer from heater (level {level})"
+                    ) from None
+                _LOGGER.debug("No answer in level %d, asking for the next entry", level)
+            else:
+                lost = 0
+                # A batch of late answers is taken in one go
+                while not queue.empty():
+                    frames.append(queue.get_nowait())
+                ended = self._add_entries(frames, level, entries)
+                if ended and not await self._async_more_entries(level, entries):
+                    if entries or restarted:
+                        break
+                    # After another level the first answer can be a stale
+                    # "end of list"; start the level once more
+                    restarted = True
+                    await self._async_send(monitor_list_request(0, level))
+                    continue
+            position = min(position + 1, MAX_POSITION)
+            await self._async_send(monitor_list_request(position, level))
+        else:
+            _LOGGER.warning("Level %d did not end after %d requests", level, position)
+        return entries
+
+    async def _async_more_entries(
+        self, level: int, entries: list[MonitorEntry]
+    ) -> bool:
+        """Wait for late entries after "end of list"; True if any arrived."""
+        assert self._list_queue is not None
+        frames: list[Frame] = []
+        try:
+            async with asyncio.timeout(LEVEL_SETTLE_TIME):
+                while True:
+                    frames.append(await self._list_queue.get())
+        except TimeoutError:
+            pass
+        count = len(entries)
+        ended = self._add_entries(frames, level, entries)
+        return len(entries) > count and not ended
+
+    @staticmethod
+    def _add_entries(
+        frames: list[Frame], level: int, entries: list[MonitorEntry]
+    ) -> bool:
+        """Add received entries; return True if the last frame ended the list."""
+        ended = False
+        for frame in frames:
+            if (entry := parse_monitor_entry(frame.payload, level)) is None:
+                ended = True
+                continue
+            ended = False
+            # The same entry twice in a row is one answer received twice
+            if (
+                not entries
+                or entries[-1].header != entry.header
+                or entries[-1].name != entry.name
+            ):
+                entries.append(entry)
+        return ended
 
     async def async_read_values(
         self, keys: list[tuple[int, int]]

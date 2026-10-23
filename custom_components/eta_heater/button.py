@@ -1,4 +1,4 @@
-"""Button to read the monitor list of the ETA heater again."""
+"""Buttons to read the monitor list of the ETA heater."""
 
 from __future__ import annotations
 
@@ -20,22 +20,32 @@ async def async_setup_entry(
     entry: EtaConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up the button."""
-    async_add_entities([EtaRereadMonitorListButton(entry)])
+    """Set up the buttons."""
+    async_add_entities(
+        [
+            EtaMonitorListButton(entry, "reread_monitor_list", reset=False),
+            EtaMonitorListButton(entry, "reset_monitor_list", reset=True),
+        ]
+    )
 
 
-class EtaRereadMonitorListButton(ButtonEntity):
-    """Read the monitor list of the configured levels from the heater again."""
+class EtaMonitorListButton(ButtonEntity):
+    """Read the monitor list of the configured levels from the heater.
+
+    Reading again merges the result into the current list, which fills gaps
+    left by lost transmissions; reset starts over with an empty list.
+    """
 
     _attr_has_entity_name = True
-    _attr_translation_key = "reread_monitor_list"
     _attr_entity_category = EntityCategory.CONFIG
     _attr_should_poll = False
 
-    def __init__(self, entry: EtaConfigEntry) -> None:
+    def __init__(self, entry: EtaConfigEntry, key: str, reset: bool) -> None:
         """Initialize the button."""
         self._entry = entry
-        self._attr_unique_id = f"{entry.entry_id}_reread_monitor_list"
+        self._reset = reset
+        self._attr_translation_key = key
+        self._attr_unique_id = f"{entry.entry_id}_{key}"
         self._attr_device_info = device_info(entry)
 
     async def async_press(self) -> None:
@@ -48,6 +58,6 @@ class EtaRereadMonitorListButton(ButtonEntity):
         coordinator.rereading = True
         self._entry.async_create_background_task(
             self.hass,
-            coordinator.async_reread_monitor_list(),
-            "eta_heater_reread_monitor_list",
+            coordinator.async_reread_monitor_list(reset=self._reset),
+            "eta_heater_read_monitor_list",
         )

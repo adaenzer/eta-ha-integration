@@ -277,6 +277,34 @@ def build_monitor_list(
     return list(values.values())
 
 
+def merge_monitor_lists(
+    stored: list[MonitorEntry], read: list[MonitorEntry]
+) -> list[MonitorEntry]:
+    """Update a stored monitor list with a new read and fill its gaps.
+
+    Reads can miss entries when a transmission gets lost, so nothing is
+    removed: entries read again are updated (keeping the lowest level and
+    any context the new read lacks), entries read for the first time are
+    added at the end.
+    """
+    by_key = {entry.key: entry for entry in read}
+    merged = []
+    for entry in stored:
+        if (new := by_key.pop(entry.key, None)) is None:
+            merged.append(entry)
+            continue
+        merged.append(
+            replace(
+                new,
+                level=min(entry.level, new.level),
+                section=new.section or entry.section,
+                group=new.group or entry.group,
+                previous=new.previous or entry.previous,
+            )
+        )
+    return merged + list(by_key.values())
+
+
 def parse_values(payload: bytes) -> dict[tuple[int, int], int] | None:
     """Parse an MD payload into raw values keyed by (node, index)."""
     if len(payload) % VALUE_RECORD_LEN:

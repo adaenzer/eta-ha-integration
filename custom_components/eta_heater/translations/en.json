@@ -101,7 +101,10 @@
   "entity": {
     "button": {
       "reread_monitor_list": {
-        "name": "Read monitor list again"
+        "name": "Read monitor list again (fill gaps)"
+      },
+      "reset_monitor_list": {
+        "name": "Reset and read monitor list"
       }
     },
     "event": {

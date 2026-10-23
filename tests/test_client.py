@@ -10,7 +10,11 @@ import pytest
 
 from custom_components.eta_heater import client as client_module
 from custom_components.eta_heater.client import EtaClient, EtaTimeoutError
-from custom_components.eta_heater.protocol import Frame
+from custom_components.eta_heater.protocol import (
+    Frame,
+    build_monitor_list,
+    merge_monitor_lists,
+)
 from custom_components.eta_heater.transport import PtvoMqttTransport
 
 from .fake_heater import TOPIC, FakeHeater, FakeMqttBackend, FakeSerialTransport
@@ -54,42 +58,6 @@ async def test_no_response(heater: FakeHeater) -> None:
         await client.async_read_monitor_list([0])
     assert len(heater.requests_of("MA")) == 4
     assert await client.async_read_values([(8, 1)]) == {}
-
-
-async def test_slow_answers_not_repeated(heater: FakeHeater) -> None:
-    """Requests wait for slow answers instead of being sent again."""
-    heater.delays = [0.03] * 20  # below the 0.05 s response timeout
-    client = EtaClient(FakeSerialTransport(heater))
-    entries = await client.async_read_monitor_list([0])
-    assert len(entries) == len(heater.monitor_list[0])
-    # one request per entry; position 0 and the end of the list confirmed
-    assert len(heater.requests_of("MA")) == len(heater.monitor_list[0]) + 3
-
-
-async def test_lost_request_repeated_after_timeout(heater: FakeHeater) -> None:
-    """A lost request is repeated only once the response timeout passed."""
-    heater.drop = 1
-    client = EtaClient(FakeSerialTransport(heater))
-    entries = await client.async_read_monitor_list([0])
-    assert len(entries) == len(heater.monitor_list[0])
-    ma = [
-        t
-        for f, t in zip(heater.requests, heater.request_times, strict=True)
-        if f.service == "MA"
-    ]
-    # the lost request, its repetition and confirmations of position 0 and
-    # the end of the list
-    assert len(ma) == len(heater.monitor_list[0]) + 4
-    assert ma[1] - ma[0] >= client_module.RESPONSE_TIMEOUT
-
-
-async def test_late_answer_not_taken_for_next(heater: FakeHeater) -> None:
-    """A late answer to a lost request is dropped, not used for the next one."""
-    heater.delays = [0.08]  # first answer arrives after the retry
-    client = EtaClient(FakeSerialTransport(heater))
-    with patch.object(client_module, "LATE_ANSWER_TIME", 0.1):
-        entries = await client.async_read_monitor_list([0])
-    assert [e.name for e in entries] == [n for _, n in heater.monitor_list[0]]
 
 
 async def test_frame_gap(heater: FakeHeater) -> None:
@@ -171,11 +139,52 @@ async def test_level_switch_quirk(heater: FakeHeater) -> None:
     assert [e.name for e in await client.async_read_monitor_list([0, 1, 2])] == expected
 
 
-async def test_answer_after_repeat_confirmed(heater: FakeHeater) -> None:
-    """After a repeated request the answer is confirmed, so nothing shifts."""
-    heater.lost_positions = {(0, 3), (2, 6)}
+async def test_slow_answers_not_repeated(heater: FakeHeater) -> None:
+    """Requests wait for slow answers instead of being sent again."""
+    heater.delays = [0.03] * 20  # below the 0.05 s response timeout
     client = EtaClient(FakeSerialTransport(heater))
-    with patch.object(client_module, "LATE_ANSWER_TIME", 0.002):
-        entries = await client.async_read_monitor_list([0, 2])
-    expected = [n for level in (0, 2) for _, n in heater.monitor_list[level]]
-    assert [e.name for e in entries] == expected
+    entries = await client.async_read_monitor_list([0])
+    assert [e.name for e in entries] == [n for _, n in heater.monitor_list[0]]
+    # one request per entry and one that got "end of list"
+    assert len(heater.requests_of("MA")) == len(heater.monitor_list[0]) + 1
+
+
+async def test_late_answer_kept(heater: FakeHeater) -> None:
+    """An answer arriving after the timeout is still kept, in order."""
+    heater.delays = [0.08]
+    client = EtaClient(FakeSerialTransport(heater))
+    entries = await client.async_read_monitor_list([0])
+    assert [e.name for e in entries] == [n for _, n in heater.monitor_list[0]]
+    ma = [
+        t
+        for f, t in zip(heater.requests, heater.request_times, strict=True)
+        if f.service == "MA"
+    ]
+    # the second request waited for the response timeout
+    assert ma[1] - ma[0] >= client_module.RESPONSE_TIMEOUT
+
+
+async def test_lost_answer_missing_then_merged(heater: FakeHeater) -> None:
+    """A lost answer leaves a gap that a second read fills."""
+    heater.lost_answers = {3}
+    client = EtaClient(FakeSerialTransport(heater))
+    first = build_monitor_list(
+        await client.async_read_monitor_list([0]), lambda e: False
+    )
+    all_names = [n for _, n in heater.monitor_list[0] if n != "Kessel"]
+    missing = heater.monitor_list[0][2][1]
+    assert missing not in [e.name for e in first]
+
+    second = build_monitor_list(
+        await client.async_read_monitor_list([0]), lambda e: False
+    )
+    merged = merge_monitor_lists(first, second)
+    assert sorted({e.name for e in merged}) == sorted(set(all_names))
+
+
+async def test_too_many_lost_answers(heater: FakeHeater) -> None:
+    """Reading gives up after several lost answers in a row."""
+    heater.lost_answers = {2, 3, 4}
+    client = EtaClient(FakeSerialTransport(heater))
+    with pytest.raises(EtaTimeoutError):
+        await client.async_read_monitor_list([0])

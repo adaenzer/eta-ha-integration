@@ -101,7 +101,10 @@
   "entity": {
     "button": {
       "reread_monitor_list": {
-        "name": "Monitorliste neu einlesen"
+        "name": "Monitorliste neu einlesen (ergänzen)"
+      },
+      "reset_monitor_list": {
+        "name": "Monitorliste zurücksetzen und neu einlesen"
       }
     },
     "event": {

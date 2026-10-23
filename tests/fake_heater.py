@@ -101,10 +101,11 @@ class FakeHeater:
         # answered with "end of list" first and the actual entry shortly after
         self.level_switch_quirk = True
         self._level: int | None = None
-        # Positions whose first request gets lost; like the real controller,
-        # the repeated request is answered with that entry and the next one
-        self.lost_positions: set[tuple[int, int]] = set()
-        self._lost: tuple[int, int] | None = None
+        self._cursor = 0
+        self._out_at = 0.0
+        # Numbers (1, 2, ...) of monitor list answers lost on the way
+        self.lost_answers: set[int] = set()
+        self._ma_answers = 0
         # Requests to ignore, and delays (seconds) for the next answers
         self.drop = 0
         self.delays: list[float] = []
@@ -126,8 +127,11 @@ class FakeHeater:
         self.output(build_frame(service, text.encode("latin-1")))
 
     def _send(self, frame: bytes) -> None:
+        # Frames arrive in the order they were sent, also when one is late
+        loop = asyncio.get_running_loop()
         delay = self.delays.pop(0) if self.delays else 0
-        asyncio.get_running_loop().call_later(delay, self.output, frame)
+        self._out_at = max(loop.time() + delay, self._out_at)
+        loop.call_at(self._out_at, self.output, frame)
 
     def _handle(self, frame: Frame) -> None:
         self.requests.append(frame)
@@ -138,35 +142,7 @@ class FakeHeater:
             self.drop -= 1
             return
         if frame.service == "MA":
-            position, level = frame.payload
-            entries = self.monitor_list.get(level, [])
-            if (level, position) in self.lost_positions:
-                self.lost_positions.discard((level, position))
-                self._lost = (level, position)
-                return
-            if self._lost == (level, position) and position + 1 < len(entries):
-                self._lost = None
-                for offset, (header, name) in enumerate(
-                    entries[position : position + 2]
-                ):
-                    payload = bytes(header) + f" {name} ".encode("latin-1")
-                    asyncio.get_running_loop().call_later(
-                        0.005 * offset, self.output, build_frame("Mb", payload)
-                    )
-                return
-            payload = b""
-            if position < len(entries):
-                header, name = entries[position]
-                payload = bytes(header) + f" {name} ".encode("latin-1")
-            switched = self._level is not None and level != self._level
-            self._level = level
-            if self.level_switch_quirk and switched and payload:
-                loop = asyncio.get_running_loop()
-                delay = self.delays.pop(0) if self.delays else 0
-                loop.call_later(delay, self.output, build_frame("Mb", b""))
-                loop.call_later(delay + 0.01, self.output, build_frame("Mb", payload))
-                return
-            self._send(build_frame("Mb", payload))
+            self._answer_monitor_list(*frame.payload)
         elif frame.service == "MC" and self.foreign_values:
             # Answer to a request of another program talking to the heater
             self._send(build_frame("MD", bytes([24, 0, 153, 0, 7])))
@@ -174,6 +150,35 @@ class FakeHeater:
                 self._answer_values(frame)
         elif frame.service == "MC" and self.answer_values:
             self._answer_values(frame)
+
+    def _answer_monitor_list(self, position: int, level: int) -> None:
+        """Answer like the real controller, which keeps a cursor.
+
+        Position 0 (or another level) starts at the first entry; any other
+        request returns the entry after the previous one, whatever position
+        it asks for.
+        """
+        entries = self.monitor_list.get(level, [])
+        switched = self._level is not None and level != self._level
+        if position == 0 or level != self._level:
+            self._cursor = 0
+        self._level = level
+        payload = b""
+        if self._cursor < len(entries):
+            header, name = entries[self._cursor]
+            payload = bytes(header) + f" {name} ".encode("latin-1")
+            self._cursor += 1
+        self._ma_answers += 1
+        if self._ma_answers in self.lost_answers:
+            return
+        if self.level_switch_quirk and switched and payload:
+            # After another level the first answer is a stale "end of list"
+            loop = asyncio.get_running_loop()
+            delay = self.delays.pop(0) if self.delays else 0
+            loop.call_later(delay, self.output, build_frame("Mb", b""))
+            loop.call_later(delay + 0.01, self.output, build_frame("Mb", payload))
+            return
+        self._send(build_frame("Mb", payload))
 
     def _answer_values(self, frame: Frame) -> None:
         payload = b""
