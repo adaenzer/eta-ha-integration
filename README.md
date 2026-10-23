@@ -15,7 +15,7 @@ for those.
 > implemented.
 >
 > **Forks welcome:** everyone may fork this repository and adapt it for their
-> own use.
+> own use under the terms of the [MIT license](LICENSE).
 >
 > **Use at your own risk:** the code comes without any warranty. It talks to
 > your heating system's controller; you are responsible for what it does on
@@ -193,3 +193,7 @@ python3.14 -m venv .venv
 
 The tests use a simulated heater (`tests/fake_heater.py`) that answers like
 the real controller, over both the serial and the PTVO/MQTT transport.
+
+## License
+
+[MIT](LICENSE)
