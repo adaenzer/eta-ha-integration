@@ -82,7 +82,7 @@
         "data_description": {
           "levels": "Levels 0 to 3 of the heater's monitor list. A change only takes effect when you press Read monitor list again on the device, because reading the list takes several minutes.",
           "scan_interval": "How often the enabled values are read from the heater. The diagnostic sensor Read duration shows how long one read takes; disabling entities you do not need makes it shorter.",
-          "publish_errors": "Also publish error messages as JSON to <topic>/error, like the former AppDaemon app."
+          "publish_errors": "Also publish error messages as JSON to the zigbee2mqtt topic followed by /error, like the former AppDaemon app."
         }
       }
     },

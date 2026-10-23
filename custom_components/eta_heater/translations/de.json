@@ -82,7 +82,7 @@
         "data_description": {
           "levels": "Ebenen 0 bis 3 der Monitorliste der Heizung. Eine Änderung wirkt erst, wenn am Gerät Monitorliste neu einlesen gedrückt wird, da das Einlesen einige Minuten dauert.",
           "scan_interval": "Wie oft die aktivierten Werte von der Heizung gelesen werden. Der Diagnosesensor Lesedauer zeigt, wie lange ein Lesevorgang dauert; nicht benötigte Entitäten zu deaktivieren verkürzt ihn.",
-          "publish_errors": "Störmeldungen zusätzlich als JSON an <Topic>/error senden, wie die bisherige AppDaemon-App."
+          "publish_errors": "Störmeldungen zusätzlich als JSON an das zigbee2mqtt-Topic mit angehängtem /error senden, wie die bisherige AppDaemon-App."
         }
       }
     },
