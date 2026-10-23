@@ -158,6 +158,9 @@
       },
       "temperature": {
         "name": "{name} (Temperatur)"
+      },
+      "seconds": {
+        "name": "{name} (Dauer)"
       }
     },
     "binary_sensor": {

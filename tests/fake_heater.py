@@ -59,6 +59,7 @@ MONITOR_LIST = {
         (entry(24, 57, 37), "S-Luftschieber"),
         (entry(24, 58, 37), "StellmotSOLL"),
         (entry(24, 63, 32, 10), "kg seit letzter  Ent"),
+        (entry(24, 91, 115), "Zustandstimer"),
     ],
 }
 
@@ -84,6 +85,7 @@ VALUES = {
     (24, 57): 1,
     (24, 58): 0,
     (24, 63): 123,
+    (24, 91): 6825,
 }
 
 

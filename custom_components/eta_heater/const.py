@@ -127,7 +127,15 @@ VALUE_TYPES: Final[dict[int, ValueType]] = {
     97: _binary("on_off"),
     104: _hours(),
     107: _measurement("percentage", PERCENTAGE),
-    115: _hours(),
+    # Seconds, e.g. "Zustandstimer" (time in the current state); the
+    # parameter list shows it: "Mischerlaufzt" 120 s, "HeizversZeit" 300 s
+    115: ValueType(
+        Platform.SENSOR,
+        "seconds",
+        SensorDeviceClass.DURATION,
+        UnitOfTime.SECONDS,
+        SensorStateClass.MEASUREMENT,
+    ),
     176: _measurement(
         "temperature", UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE
     ),

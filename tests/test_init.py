@@ -437,6 +437,11 @@ async def test_names_and_attributes(hass: HomeAssistant, heater: FakeHeater) -> 
 
     assert state(40, 19).state == "1.5"  # 1500 mA with divider 1000
 
+    timer = state(24, 91)
+    assert timer.state == "6825"
+    assert timer.attributes["unit_of_measurement"] == "s"
+    assert timer.attributes["state_class"] == "measurement"
+
 
 async def test_read_again_merges_reset_replaces(
     hass: HomeAssistant, heater: FakeHeater, serial_entry: MockConfigEntry
