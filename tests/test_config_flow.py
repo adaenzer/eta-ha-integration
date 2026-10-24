@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -40,6 +41,17 @@ from .conftest import PTVO_DATA, SERIAL_DATA
 from .fake_heater import TOPIC, FakeHeater
 
 pytestmark = pytest.mark.usefixtures("transports")
+
+
+@pytest.fixture(autouse=True)
+async def settle(hass: HomeAssistant, transports: list) -> AsyncGenerator[None]:
+    """Let background work (monitor list read, reload) finish after each test.
+
+    Depends on transports, so the fakes are still connected meanwhile.
+    """
+    yield
+    await hass.async_block_till_done(wait_background_tasks=True)
+    await hass.async_block_till_done()
 
 
 async def _finish_levels(hass: HomeAssistant, result: dict) -> dict:
