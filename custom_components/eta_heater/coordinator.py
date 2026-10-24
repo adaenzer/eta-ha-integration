@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 import logging
 from time import monotonic
 
@@ -12,6 +12,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er, issue_registry as ir
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+import homeassistant.util.dt as dt_util
 
 from .client import EtaClient, EtaError
 from .const import (
@@ -23,7 +24,12 @@ from .const import (
     STORAGE_VERSION,
     value_type_for,
 )
-from .protocol import MonitorEntry, build_monitor_list, merge_monitor_lists
+from .protocol import (
+    DisplayContent,
+    MonitorEntry,
+    build_monitor_list,
+    merge_monitor_lists,
+)
 from .transport import TransportError
 
 _LOGGER = logging.getLogger(__name__)
@@ -93,6 +99,9 @@ class EtaCoordinator(DataUpdateCoordinator[EtaData]):
         self.list_levels: list[int] = []
         self.rereading = False
         self.last_read_duration: float | None = None
+        # Display content read on request, and when it was read
+        self.display: DisplayContent | None = None
+        self.display_read_at: datetime | None = None
         # When each value was last received, to keep showing it for a while
         # when a read misses it
         self._received_at: dict[tuple[int, int], float] = {}
@@ -228,6 +237,13 @@ class EtaCoordinator(DataUpdateCoordinator[EtaData]):
                 "list_levels": ", ".join(map(str, self.list_levels)),
             },
         )
+
+    async def async_read_display(self) -> DisplayContent:
+        """Read the display content and let the display sensor show it."""
+        self.display = await self.client.async_read_display()
+        self.display_read_at = dt_util.utcnow()
+        self.async_update_listeners()
+        return self.display
 
     def enabled_by_default(self, monitor_entry: MonitorEntry) -> bool:
         """Return True if a value's entity is enabled when it is first created.

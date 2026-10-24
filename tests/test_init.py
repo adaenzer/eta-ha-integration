@@ -504,6 +504,8 @@ async def test_commands(hass: HomeAssistant, heater: FakeHeater) -> None:
     await hass.async_block_till_done()
     commands = heater.requests_of("IH")
     assert [c.payload for c in commands] == [bytes([0x20, 0])]
+    # the display is read to show the controller's confirmation
+    assert [f.payload for f in heater.requests_of("II")] == [b"1", b"0"]
     # the values are read right after to show the effect
     assert heater.requests_of("MC")
 
@@ -526,3 +528,40 @@ async def test_no_command_buttons_by_default(
     assert not er.async_get(hass).async_get_entity_id(
         "button", DOMAIN, f"{serial_entry.entry_id}_boiler_on"
     )
+
+
+async def test_read_display(
+    hass: HomeAssistant, heater: FakeHeater, serial_entry: MockConfigEntry
+) -> None:
+    """The display is read on request; mirroring is switched off again."""
+    await _setup(hass, serial_entry)
+    registry = er.async_get(hass)
+    sensor = registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{serial_entry.entry_id}_display"
+    )
+    assert hass.states.get(sensor).state == STATE_UNAVAILABLE
+
+    button = registry.async_get_entity_id(
+        "button", DOMAIN, f"{serial_entry.entry_id}_read_display"
+    )
+    await hass.services.async_call(
+        BUTTON_DOMAIN, SERVICE_PRESS, {ATTR_ENTITY_ID: button}, blocking=True
+    )
+    await hass.async_block_till_done()
+    state = hass.states.get(sensor)
+    assert (
+        state.state
+        == "20:29:59 | TEMPERATURANZEIGEN | HACK.KES Bereit | PUFFER Geladen"
+    )
+    assert state.attributes["line_3"] == "HACK.KES Bereit"
+    assert state.attributes["led_green"] is True
+    assert state.attributes["led_red"] is False
+    assert [f.payload for f in heater.requests_of("II")] == [b"1", b"0"]
+    assert not heater.mirroring
+
+    heater.respond = False
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(
+            BUTTON_DOMAIN, SERVICE_PRESS, {ATTR_ENTITY_ID: button}, blocking=True
+        )
+    assert heater.requests_of("II")[-1].payload == b"0"

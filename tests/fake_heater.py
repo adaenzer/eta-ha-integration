@@ -102,6 +102,15 @@ class FakeHeater:
         self.lost_value_answers: set[int] = set()
         self._mc_answers = 0
         self.foreign_values = False
+        self.mirroring = False
+        # 4 lines of 20 characters and 9 flags, as the controller sends them
+        self.display = (
+            f"{'20:29:59':>19} "
+            f"{'TEMPERATURANZEIGEN':<19}\xb3"
+            f"{'HACK.KES     Bereit':<20}"
+            f"{'PUFFER      Geladen':<20}"
+            "000001000"
+        )
         # Like the real controller: the first request of another level is
         # answered with "end of list" first and the actual entry shortly after
         self.level_switch_quirk = True
@@ -141,6 +150,11 @@ class FakeHeater:
     def _handle(self, frame: Frame) -> None:
         self.requests.append(frame)
         self.request_times.append(monotonic())
+        if frame.service == "II" and self.respond:
+            self.mirroring = frame.payload == b"1"
+            if self.mirroring:
+                self._send(build_frame("IE", self.display.encode("latin-1")))
+            return
         if not self.respond or frame.service not in ("MA", "MC"):
             return
         if self.drop:

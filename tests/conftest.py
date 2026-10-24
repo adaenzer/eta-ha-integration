@@ -10,7 +10,10 @@ from homeassistant.const import CONF_DEVICE
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.eta_heater import client as client_module
+from custom_components.eta_heater import (
+    button as button_module,
+    client as client_module,
+)
 from custom_components.eta_heater.const import (
     BROKER_HOME_ASSISTANT,
     CONF_BAUDRATE,
@@ -52,8 +55,10 @@ def short_timeouts(monkeypatch: pytest.MonkeyPatch) -> None:
         ("VALUES_TIMEOUT", 0.1),
         ("MORE_VALUES_TIME", 0.02),
         ("DISCONNECT_TIMEOUT", 0.5),
+        ("DISPLAY_TIMEOUT", 0.1),
     ):
         monkeypatch.setattr(client_module, name, value)
+    monkeypatch.setattr(button_module, "DISPLAY_AFTER_COMMAND", 0)
 
 
 @pytest.fixture(autouse=True)

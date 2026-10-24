@@ -120,10 +120,19 @@ that send the remote control commands ETA's GSM connector sends for SMS
 | Heating auto / day / night | 0x02 / 0x04 / 0x08 | Created disabled. Only acts on heating circuits with "SMS erlauben" = yes |
 | Heating per switch | 0x01 | Created disabled. Hands control back to the physical switch |
 
-The controller does not confirm these commands in a documented way; the
-values are read right after a command, and its effect shows in them (e.g. the
-boiler state). Errors cannot be acknowledged this way, and simulating the
-display's keys is not supported.
+The controller confirms the commands with an INFO message on its display
+(and usually as an `IM` message, e.g. "Kessel wurde per SMS AUS geschaltet").
+
+### Display (same branch)
+
+The button **Read display** switches the controller's display mirroring on
+(service `II`, as ETA's display simulator does), takes the first complete
+display frame (`IE`) and switches mirroring off again. The sensor **Display**
+then shows the four lines joined with " | ", with the single lines, the 9
+status flags and the LEDs (green: operation, red: fault) as attributes. After
+each command the display is read automatically a few seconds later. Over a
+flaky Zigbee link a display frame can be incomplete; only complete frames are
+taken.
 
 ## How data is updated
 

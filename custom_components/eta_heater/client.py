@@ -19,15 +19,19 @@ from operator import itemgetter
 from time import monotonic
 
 from .protocol import (
+    SERVICE_DISPLAY,
     SERVICE_MONITOR_LIST_ENTRY,
     SERVICE_STOP,
     SERVICE_UNSUBSCRIBE,
     SERVICE_VALUES,
+    DisplayContent,
     Frame,
     FrameParser,
     MonitorEntry,
     build_frame,
+    display_mirror_request,
     monitor_list_request,
+    parse_display,
     parse_monitor_entry,
     parse_values,
     sms_command_request,
@@ -60,6 +64,8 @@ MAX_UNANSWERED_GROUPS = 2
 # Once the first values of a group arrived, wait this long for the rest
 MORE_VALUES_TIME = 1.0
 DISCONNECT_TIMEOUT = 30.0
+# How long to wait for a complete display frame
+DISPLAY_TIMEOUT = 15.0
 MAX_POSITION = 255  # the list position is a single byte
 # Refresh interval requested from the heater while reading values: how soon
 # the values are sent again when the first answer got lost
@@ -88,6 +94,7 @@ class EtaClient:
         self._waiters: dict[str, asyncio.Future[Frame]] = {}
         self._value_queue: asyncio.Queue[dict[tuple[int, int], int]] | None = None
         self._list_queue: asyncio.Queue[Frame] | None = None
+        self._display_queue: asyncio.Queue[DisplayContent] | None = None
         self._error_listeners: list[ErrorListener] = []
         # Values this client ever subscribed to; value frames with none of
         # them were requested by another program talking to the heater
@@ -141,6 +148,14 @@ class EtaClient:
             if self._value_queue is not None:
                 self._value_queue.put_nowait(values)
             return
+        if frame.service == SERVICE_DISPLAY:
+            if (
+                self._display_queue is not None
+                and frame.checksum_ok
+                and (content := parse_display(frame.payload)) is not None
+            ):
+                self._display_queue.put_nowait(content)
+            return
         if frame.service == SERVICE_MONITOR_LIST_ENTRY and self._list_queue is not None:
             self._list_queue.put_nowait(frame)
             return
@@ -186,6 +201,25 @@ class EtaClient:
         async with self._lock:
             _LOGGER.info("Sending command 0x%02x to the heater", code)
             await self._async_send(sms_command_request(code))
+
+    async def async_read_display(self) -> DisplayContent:
+        """Read the display: mirroring on, first complete frame, mirroring off.
+
+        Over Zigbee display frames sometimes arrive without their beginning;
+        only complete frames with a valid checksum are taken.
+        """
+        async with self._lock:
+            self._display_queue = asyncio.Queue()
+            try:
+                await self._async_send(display_mirror_request(True))
+                try:
+                    async with asyncio.timeout(DISPLAY_TIMEOUT):
+                        return await self._display_queue.get()
+                except TimeoutError:
+                    raise EtaTimeoutError("No display content from heater") from None
+            finally:
+                self._display_queue = None
+                await self._async_send(display_mirror_request(False))
 
     async def async_probe(self) -> None:
         """Check that the heater answers; raises EtaError if it does not."""

@@ -41,6 +41,13 @@ SERVICE_STOP = "MO"  # stops any list transfer in progress
 # Remote control as used by ETA's GSM connector ("Heizung über SMS
 # umschalten"): Data[0] selects the command, Data[1] is 0
 SERVICE_SMS_COMMAND = "IH"
+# Display mirroring as used by ETA's display simulator: II "1" switches it
+# on, II "0" off; while on, the controller sends the display as IE frames
+SERVICE_DISPLAY_MIRROR = "II"
+SERVICE_DISPLAY = "IE"
+DISPLAY_LINES = 4
+DISPLAY_WIDTH = 20
+DISPLAY_FLAGS = 9
 
 ERROR_SERVICES = frozenset({"IM", "SE", "SS"})
 FRAME_STARTS = (b"{I", b"{M", b"{P", b"{S")
@@ -339,6 +346,56 @@ def parse_values(payload: bytes) -> dict[tuple[int, int], int] | None:
         node, idx_hb, idx_lb, val_hb, val_lb = payload[pos : pos + VALUE_RECORD_LEN]
         values[(node, idx_hb * 256 + idx_lb)] = val_hb * 256 + val_lb
     return values
+
+
+def display_mirror_request(on: bool) -> bytes:
+    """Build the request to switch display mirroring on or off."""
+    return build_frame(SERVICE_DISPLAY_MIRROR, b"1" if on else b"0")
+
+
+@dataclass(frozen=True, slots=True)
+class DisplayContent:
+    """The content of the heater's display (an IE frame)."""
+
+    lines: tuple[str, ...]
+    # One character per flag; found by testing: position 6 is the green LED
+    # (operation), position 8 the red LED (fault)
+    flags: str
+
+    @property
+    def led_green(self) -> bool:
+        """Return True if the green LED (operation) is on."""
+        return self.flags[5:6] == "1"
+
+    @property
+    def led_red(self) -> bool:
+        """Return True if the red LED (fault) is on."""
+        return self.flags[7:8] == "1"
+
+    @property
+    def text(self) -> str:
+        """Return the non-empty lines, joined."""
+        return " | ".join(line for line in self.lines if line)
+
+
+def parse_display(payload: bytes) -> DisplayContent | None:
+    """Parse the payload of an IE frame: 4 lines of 20 characters and flags."""
+    size = DISPLAY_LINES * DISPLAY_WIDTH
+    if len(payload) < size + DISPLAY_FLAGS:
+        return None
+    text = payload.decode(ENCODING)
+    # 0xA0 is a non-breaking space, 0xB3 a marker the display shows at the
+    # end of a line
+    lines = tuple(
+        " ".join(
+            text[i : i + DISPLAY_WIDTH]
+            .replace("\xb3", " ")
+            .replace("\xa0", " ")
+            .split()
+        )
+        for i in range(0, size, DISPLAY_WIDTH)
+    )
+    return DisplayContent(lines, text[size : size + DISPLAY_FLAGS])
 
 
 def sms_command_request(code: int) -> bytes:

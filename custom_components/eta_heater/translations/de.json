@@ -128,6 +128,9 @@
       },
       "heating_switch": {
         "name": "Heizung nach Schalter"
+      },
+      "read_display": {
+        "name": "Anzeige lesen"
       }
     },
     "event": {
@@ -187,6 +190,35 @@
       },
       "seconds": {
         "name": "{name} (Dauer)"
+      },
+      "display": {
+        "name": "Anzeige",
+        "state_attributes": {
+          "line_1": {
+            "name": "Zeile 1"
+          },
+          "line_2": {
+            "name": "Zeile 2"
+          },
+          "line_3": {
+            "name": "Zeile 3"
+          },
+          "line_4": {
+            "name": "Zeile 4"
+          },
+          "flags": {
+            "name": "Flags"
+          },
+          "led_green": {
+            "name": "LED grün (Betrieb)"
+          },
+          "led_red": {
+            "name": "LED rot (Störung)"
+          },
+          "read_at": {
+            "name": "Gelesen um"
+          }
+        }
       }
     },
     "binary_sensor": {
@@ -222,6 +254,9 @@
     },
     "command_failed": {
       "message": "Senden des Befehls fehlgeschlagen: {error}"
+    },
+    "display_failed": {
+      "message": "Lesen der Anzeige fehlgeschlagen: {error}"
     }
   },
   "issues": {

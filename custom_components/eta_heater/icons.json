@@ -27,6 +27,9 @@
       },
       "heating_switch": {
         "default": "mdi:radiator-disabled"
+      },
+      "read_display": {
+        "default": "mdi:monitor-eye"
       }
     },
     "event": {
@@ -46,6 +49,9 @@
       },
       "read_duration": {
         "default": "mdi:timer-outline"
+      },
+      "display": {
+        "default": "mdi:monitor"
       }
     },
     "binary_sensor": {

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
+
 from homeassistant.components.button import ButtonEntity
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
@@ -14,7 +17,11 @@ from .coordinator import EtaConfigEntry
 from .entity import device_info
 from .transport import TransportError
 
+_LOGGER = logging.getLogger(__name__)
+
 PARALLEL_UPDATES = 0
+# Seconds after a command until the display is read to show its confirmation
+DISPLAY_AFTER_COMMAND = 3
 
 
 async def async_setup_entry(
@@ -26,6 +33,7 @@ async def async_setup_entry(
     buttons: list[ButtonEntity] = [
         EtaMonitorListButton(entry, "reread_monitor_list", reset=False),
         EtaMonitorListButton(entry, "reset_monitor_list", reset=True),
+        EtaReadDisplayButton(entry),
     ]
     if entry.options.get(CONF_ALLOW_COMMANDS, False):
         buttons += [EtaCommandButton(entry, command) for command in HEATER_COMMANDS]
@@ -98,4 +106,40 @@ class EtaCommandButton(ButtonEntity):
                 translation_key="command_failed",
                 translation_placeholders={"error": str(err)},
             ) from err
+        # The controller confirms commands on its display (INFO screen)
+        await asyncio.sleep(DISPLAY_AFTER_COMMAND)
+        try:
+            await coordinator.async_read_display()
+        except (EtaError, TransportError) as err:
+            _LOGGER.debug("Could not read the display after the command: %s", err)
         await coordinator.async_request_refresh()
+
+
+class EtaReadDisplayButton(ButtonEntity):
+    """Read the heater's display into the display sensor."""
+
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+    _attr_translation_key = "read_display"
+
+    def __init__(self, entry: EtaConfigEntry) -> None:
+        """Initialize the button."""
+        self._entry = entry
+        self._attr_unique_id = f"{entry.entry_id}_read_display"
+        self._attr_device_info = device_info(entry)
+
+    async def async_press(self) -> None:
+        """Read the display."""
+        coordinator = self._entry.runtime_data
+        if coordinator.rereading:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="busy_reading_list"
+            )
+        try:
+            await coordinator.async_read_display()
+        except (EtaError, TransportError) as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="display_failed",
+                translation_placeholders={"error": str(err)},
+            ) from err

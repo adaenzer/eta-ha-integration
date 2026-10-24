@@ -14,6 +14,8 @@ from custom_components.eta_heater.protocol import (
     build_frame,
     build_monitor_list,
     clean_display_text,
+    display_mirror_request,
+    parse_display,
     parse_monitor_entry,
     parse_values,
     sms_command_request,
@@ -202,3 +204,30 @@ def test_clean_display_text() -> None:
     # a hyphen before an upper case word is kept, e.g. "Pellets-" "Austragung"
     assert clean_display_text("Pellets-\nAustragung") == "Pellets- Austragung"
     assert clean_display_text("one line") == "one line"
+
+
+def test_parse_display() -> None:
+    """Display frames hold 4 lines of 20 characters and 9 flags."""
+    payload = (
+        b"Hackgutsteuerung 0  "
+        + b"        INFO        "
+        + b"\xa0Kessel wurde per   "
+        + b" SMS EIN geschaltet "
+        + b"000000010"
+    )
+    display = parse_display(payload)
+    assert display is not None
+    assert display.lines == (
+        "Hackgutsteuerung 0",
+        "INFO",
+        "Kessel wurde per",
+        "SMS EIN geschaltet",
+    )
+    assert (
+        display.text
+        == "Hackgutsteuerung 0 | INFO | Kessel wurde per | SMS EIN geschaltet"
+    )
+    assert display.led_red and not display.led_green
+    assert parse_display(b"too short") is None
+    assert display_mirror_request(True) == bytes.fromhex("7B 49 49 01 31 31 7D")
+    assert display_mirror_request(False) == bytes.fromhex("7B 49 49 01 30 30 7D")

@@ -128,6 +128,9 @@
       },
       "heating_switch": {
         "name": "Heating per switch"
+      },
+      "read_display": {
+        "name": "Read display"
       }
     },
     "event": {
@@ -187,6 +190,35 @@
       },
       "seconds": {
         "name": "{name} (duration)"
+      },
+      "display": {
+        "name": "Display",
+        "state_attributes": {
+          "line_1": {
+            "name": "Line 1"
+          },
+          "line_2": {
+            "name": "Line 2"
+          },
+          "line_3": {
+            "name": "Line 3"
+          },
+          "line_4": {
+            "name": "Line 4"
+          },
+          "flags": {
+            "name": "Flags"
+          },
+          "led_green": {
+            "name": "LED green (operation)"
+          },
+          "led_red": {
+            "name": "LED red (fault)"
+          },
+          "read_at": {
+            "name": "Read at"
+          }
+        }
       }
     },
     "binary_sensor": {
@@ -222,6 +254,9 @@
     },
     "command_failed": {
       "message": "Sending the command failed: {error}"
+    },
+    "display_failed": {
+      "message": "Reading the display failed: {error}"
     }
   },
   "issues": {
