@@ -59,9 +59,12 @@ class EtaSensor(EtaValueEntity, SensorEntity):
             self._attr_state_class = SensorStateClass.MEASUREMENT
 
     @property
-    def native_value(self) -> float | int:
+    def native_value(self) -> float | int | str:
         """Return the value."""
-        return self.raw_value
+        if (states := self.value_type.states) is None:
+            return self.raw_value
+        # Unknown numbers stay apart, e.g. "7", so they can be found later
+        return states.get(int(self.raw_value), str(int(self.raw_value)))
 
 
 class EtaReadDurationSensor(CoordinatorEntity[EtaCoordinator], SensorEntity):

@@ -133,13 +133,31 @@
         "name": "Lesedauer"
       },
       "boiler_state": {
-        "name": "{name} (Status)"
+        "name": "{name} (Status)",
+        "state": {
+          "off": "Ausgeschaltet",
+          "preheating": "Heizvorbereitung",
+          "igniting": "Zündet",
+          "heating": "Heizt",
+          "ember_burnout": "Glutabbrand",
+          "ready": "Bereit",
+          "deashing": "Entaschen",
+          "blocked": "Gesperrt",
+          "external_heat": "Fremdwärme",
+          "calibrating": "Kalibrieren",
+          "fault": "Störung"
+        }
       },
       "drive_state": {
         "name": "{name} (Status)"
       },
       "hot_water_state": {
-        "name": "{name} (Status)"
+        "name": "{name} (Status)",
+        "state": {
+          "charging": "Laden",
+          "charged": "Geladen",
+          "requesting": "Fordert an"
+        }
       },
       "number": {
         "name": "{name} (Wert)"

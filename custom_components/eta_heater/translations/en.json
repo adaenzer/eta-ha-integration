@@ -133,13 +133,31 @@
         "name": "Read duration"
       },
       "boiler_state": {
-        "name": "{name} (state)"
+        "name": "{name} (state)",
+        "state": {
+          "off": "Off",
+          "preheating": "Preheating",
+          "igniting": "Igniting",
+          "heating": "Heating",
+          "ember_burnout": "Ember burnout",
+          "ready": "Ready",
+          "deashing": "De-ashing",
+          "blocked": "Blocked",
+          "external_heat": "External heat",
+          "calibrating": "Calibrating",
+          "fault": "Fault"
+        }
       },
       "drive_state": {
         "name": "{name} (state)"
       },
       "hot_water_state": {
-        "name": "{name} (state)"
+        "name": "{name} (state)",
+        "state": {
+          "charging": "Charging",
+          "charged": "Charged",
+          "requesting": "Requesting"
+        }
       },
       "number": {
         "name": "{name} (value)"
