@@ -217,6 +217,9 @@
           },
           "read_at": {
             "name": "Read at"
+          },
+          "complete": {
+            "name": "Complete"
           }
         }
       }

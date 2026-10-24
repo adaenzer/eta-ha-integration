@@ -217,6 +217,9 @@
           },
           "read_at": {
             "name": "Gelesen um"
+          },
+          "complete": {
+            "name": "Vollständig"
           }
         }
       }

@@ -131,8 +131,10 @@ display frame (`IE`) and switches mirroring off again. The sensor **Display**
 then shows the four lines joined with " | ", with the single lines, the 9
 status flags and the LEDs (green: operation, red: fault) as attributes. After
 each command the display is read automatically a few seconds later. Over a
-flaky Zigbee link a display frame can be incomplete; only complete frames are
-taken.
+flaky Zigbee link a display frame sometimes arrives without its beginning;
+mirroring is then requested again (up to four times). If only frame ends
+arrive, the sensor shows the readable end of the last line with "…" and the
+attribute `complete` is false; the flags and LEDs are still reliable.
 
 ## How data is updated
 

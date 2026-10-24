@@ -55,7 +55,7 @@ def short_timeouts(monkeypatch: pytest.MonkeyPatch) -> None:
         ("VALUES_TIMEOUT", 0.1),
         ("MORE_VALUES_TIME", 0.02),
         ("DISCONNECT_TIMEOUT", 0.5),
-        ("DISPLAY_TIMEOUT", 0.1),
+        ("DISPLAY_ATTEMPT_TIMEOUT", 0.05),
     ):
         monkeypatch.setattr(client_module, name, value)
     monkeypatch.setattr(button_module, "DISPLAY_AFTER_COMMAND", 0)

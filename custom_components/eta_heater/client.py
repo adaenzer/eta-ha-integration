@@ -32,6 +32,7 @@ from .protocol import (
     display_mirror_request,
     monitor_list_request,
     parse_display,
+    parse_display_tail,
     parse_monitor_entry,
     parse_values,
     sms_command_request,
@@ -64,8 +65,10 @@ MAX_UNANSWERED_GROUPS = 2
 # Once the first values of a group arrived, wait this long for the rest
 MORE_VALUES_TIME = 1.0
 DISCONNECT_TIMEOUT = 30.0
-# How long to wait for a complete display frame
-DISPLAY_TIMEOUT = 15.0
+# Mirroring requests per display read, and how long to wait after each one
+# for a complete display frame
+DISPLAY_ATTEMPTS = 4
+DISPLAY_ATTEMPT_TIMEOUT = 4.0
 MAX_POSITION = 255  # the list position is a single byte
 # Refresh interval requested from the heater while reading values: how soon
 # the values are sent again when the first answer got lost
@@ -95,12 +98,18 @@ class EtaClient:
         self._value_queue: asyncio.Queue[dict[tuple[int, int], int]] | None = None
         self._list_queue: asyncio.Queue[Frame] | None = None
         self._display_queue: asyncio.Queue[DisplayContent] | None = None
+        self._display_tail: DisplayContent | None = None
         self._error_listeners: list[ErrorListener] = []
         # Values this client ever subscribed to; value frames with none of
         # them were requested by another program talking to the heater
         self._requested_keys: set[tuple[int, int]] = set()
         self.foreign_value_frames = 0
-        transport.set_receiver(self._parser.feed)
+        transport.set_receiver(self._received)
+
+    def _received(self, data: bytes) -> None:
+        if self._display_queue is not None and (tail := parse_display_tail(data)):
+            self._display_tail = tail
+        self._parser.feed(data)
 
     async def async_connect(self) -> None:
         """Open the transport and stop subscriptions left by anyone else."""
@@ -205,21 +214,29 @@ class EtaClient:
     async def async_read_display(self) -> DisplayContent:
         """Read the display: mirroring on, first complete frame, mirroring off.
 
-        Over Zigbee display frames sometimes arrive without their beginning;
-        only complete frames with a valid checksum are taken.
+        The controller sends the display right after mirroring is switched
+        on. Over Zigbee a frame sometimes arrives without its beginning, so
+        mirroring on is requested again until a complete frame (valid
+        checksum) arrives. If only frame ends arrived, the last one is
+        returned (complete=False): its flags are reliable, its text is not.
         """
         async with self._lock:
             self._display_queue = asyncio.Queue()
+            self._display_tail = None
             try:
-                await self._async_send(display_mirror_request(True))
-                try:
-                    async with asyncio.timeout(DISPLAY_TIMEOUT):
-                        return await self._display_queue.get()
-                except TimeoutError:
-                    raise EtaTimeoutError("No display content from heater") from None
+                for _ in range(DISPLAY_ATTEMPTS):
+                    await self._async_send(display_mirror_request(True))
+                    try:
+                        async with asyncio.timeout(DISPLAY_ATTEMPT_TIMEOUT):
+                            return await self._display_queue.get()
+                    except TimeoutError:
+                        _LOGGER.debug("No complete display frame, asking again")
             finally:
                 self._display_queue = None
                 await self._async_send(display_mirror_request(False))
+        if self._display_tail is not None:
+            return self._display_tail
+        raise EtaTimeoutError("No display content from heater")
 
     async def async_probe(self) -> None:
         """Check that the heater answers; raises EtaError if it does not."""

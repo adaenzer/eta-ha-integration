@@ -17,6 +17,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 import logging
+import re
 from time import monotonic
 
 _LOGGER = logging.getLogger(__name__)
@@ -361,6 +362,8 @@ class DisplayContent:
     # One character per flag; found by testing: position 6 is the green LED
     # (operation), position 8 the red LED (fault)
     flags: str
+    # False if only the end of a display frame arrived (see parse_display_tail)
+    complete: bool = True
 
     @property
     def led_green(self) -> bool:
@@ -374,8 +377,9 @@ class DisplayContent:
 
     @property
     def text(self) -> str:
-        """Return the non-empty lines, joined."""
-        return " | ".join(line for line in self.lines if line)
+        """Return the non-empty lines, joined; "…" marks a missing beginning."""
+        text = " | ".join(line for line in self.lines if line)
+        return text if self.complete else f"… {text}"
 
 
 def parse_display(payload: bytes) -> DisplayContent | None:
@@ -396,6 +400,28 @@ def parse_display(payload: bytes) -> DisplayContent | None:
         for i in range(0, size, DISPLAY_WIDTH)
     )
     return DisplayContent(lines, text[size : size + DISPLAY_FLAGS])
+
+
+_DISPLAY_TAIL = re.compile(rb"([\x20-\xff]*?)([01]{9})\}?$")
+
+
+def parse_display_tail(data: bytes) -> DisplayContent | None:
+    """Parse the end of a display frame whose beginning got lost.
+
+    Over Zigbee a display frame is sometimes split and only its end arrives:
+    the end of the last line and the 9 flags. The flags are complete, the
+    text is not.
+    """
+    if data.startswith(FRAME_STARTS) or not (match := _DISPLAY_TAIL.search(data)):
+        return None
+    text = " ".join(
+        match.group(1)
+        .decode(ENCODING)
+        .replace("\xb3", " ")
+        .replace("\xa0", " ")
+        .split()
+    )
+    return DisplayContent(("", "", "", text), match.group(2).decode(), complete=False)
 
 
 def sms_command_request(code: int) -> bytes:

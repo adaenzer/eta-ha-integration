@@ -96,7 +96,16 @@ class EtaDisplaySensor(CoordinatorEntity[EtaCoordinator], SensorEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "display"
     _unrecorded_attributes = frozenset(
-        {"line_1", "line_2", "line_3", "line_4", "flags", "led_green", "led_red"}
+        {
+            "line_1",
+            "line_2",
+            "line_3",
+            "line_4",
+            "complete",
+            "flags",
+            "led_green",
+            "led_red",
+        }
     )
 
     def __init__(self, coordinator: EtaCoordinator) -> None:
@@ -125,6 +134,7 @@ class EtaDisplaySensor(CoordinatorEntity[EtaCoordinator], SensorEntity):
             f"line_{number}": line for number, line in enumerate(display.lines, 1)
         }
         attributes |= {
+            "complete": display.complete,
             "flags": display.flags,
             "led_green": display.led_green,
             "led_red": display.led_red,

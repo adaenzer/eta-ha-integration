@@ -209,3 +209,29 @@ async def test_too_many_lost_answers(heater: FakeHeater) -> None:
     client = EtaClient(FakeSerialTransport(heater))
     with pytest.raises(EtaTimeoutError):
         await client.async_read_monitor_list([0])
+
+
+async def test_display_asked_again_until_complete(heater: FakeHeater) -> None:
+    """Mirroring is requested again when only the end of a frame arrived."""
+    heater.display_lost = 2
+    client = EtaClient(FakeSerialTransport(heater))
+    display = await client.async_read_display()
+    assert display.complete
+    assert display.lines[2] == "HACK.KES Bereit"
+    assert [f.payload for f in heater.requests_of("II")] == [b"1", b"1", b"1", b"0"]
+
+
+async def test_display_tail_as_fallback(heater: FakeHeater) -> None:
+    """If no complete frame arrives, the flags from a frame end are used."""
+    heater.display_lost = 10
+    client = EtaClient(FakeSerialTransport(heater))
+    display = await client.async_read_display()
+    assert not display.complete
+    assert display.flags == "000001000"
+    assert display.led_green
+    assert display.text == "… UFFER Geladen"  # the beginning got lost
+    assert heater.requests_of("II")[-1].payload == b"0"
+
+    heater.respond = False
+    with pytest.raises(EtaTimeoutError):
+        await client.async_read_display()

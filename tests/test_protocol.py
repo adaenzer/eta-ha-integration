@@ -16,6 +16,7 @@ from custom_components.eta_heater.protocol import (
     clean_display_text,
     display_mirror_request,
     parse_display,
+    parse_display_tail,
     parse_monitor_entry,
     parse_values,
     sms_command_request,
@@ -231,3 +232,15 @@ def test_parse_display() -> None:
     assert parse_display(b"too short") is None
     assert display_mirror_request(True) == bytes.fromhex("7B 49 49 01 31 31 7D")
     assert display_mirror_request(False) == bytes.fromhex("7B 49 49 01 30 30 7D")
+
+
+def test_parse_display_tail() -> None:
+    """The end of a display frame gives the flags and part of the text."""
+    tail = parse_display_tail(b"SMS EIN geschaltet 000000010}")
+    assert tail is not None
+    assert not tail.complete
+    assert tail.flags == "000000010"
+    assert tail.led_red
+    assert tail.text == "… SMS EIN geschaltet"
+    assert parse_display_tail(b"{MD\x05...") is None
+    assert parse_display_tail(b"no flags here") is None

@@ -103,6 +103,8 @@ class FakeHeater:
         self._mc_answers = 0
         self.foreign_values = False
         self.mirroring = False
+        # Display frames of which only the end arrives
+        self.display_lost = 0
         # 4 lines of 20 characters and 9 flags, as the controller sends them
         self.display = (
             f"{'20:29:59':>19} "
@@ -152,8 +154,14 @@ class FakeHeater:
         self.request_times.append(monotonic())
         if frame.service == "II" and self.respond:
             self.mirroring = frame.payload == b"1"
-            if self.mirroring:
-                self._send(build_frame("IE", self.display.encode("latin-1")))
+            if not self.mirroring:
+                return
+            if self.display_lost:
+                # Over Zigbee only the end of the frame arrives
+                self.display_lost -= 1
+                self._send(self.display.encode("latin-1")[-28:])
+                return
+            self._send(build_frame("IE", self.display.encode("latin-1")))
             return
         if not self.respond or frame.service not in ("MA", "MC"):
             return
