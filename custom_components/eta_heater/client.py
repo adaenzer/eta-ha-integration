@@ -13,7 +13,9 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
+from itertools import groupby
 import logging
+from operator import itemgetter
 from time import monotonic
 
 from .protocol import (
@@ -48,14 +50,19 @@ MONITOR_LIST_MAX_LOST = 3
 LEVEL_SETTLE_TIME = 1.5
 # Requests per level at most (the heater's lists have up to about 200 entries)
 MAX_LEVEL_REQUESTS = 400
-VALUES_TIMEOUT = 30.0
+# Over Zigbee the first answer to a subscription can get lost; the heater
+# sends the values again every SUBSCRIBE_REFRESH_S, so waiting a bit longer
+# than twice that gives a lost answer two more chances
+VALUES_TIMEOUT = 40.0
+# Groups without any answer in a row after which a value read stops
+MAX_UNANSWERED_GROUPS = 2
 # Once the first values of a group arrived, wait this long for the rest
 MORE_VALUES_TIME = 1.0
 DISCONNECT_TIMEOUT = 30.0
 MAX_POSITION = 255  # the list position is a single byte
-# Refresh interval requested from the heater while reading values. Each group
-# is unsubscribed before it repeats, so this only needs to exceed the timeout.
-SUBSCRIBE_REFRESH_S = 30
+# Refresh interval requested from the heater while reading values: how soon
+# the values are sent again when the first answer got lost
+SUBSCRIBE_REFRESH_S = 15
 
 ErrorListener = Callable[[Frame], None]
 
@@ -288,16 +295,16 @@ class EtaClient:
     ) -> dict[tuple[int, int], int]:
         """Read raw values, in groups as large as the transport allows.
 
-        If the heater does not answer a group at all, the remaining groups
-        are not requested and the values read so far are returned.
+        A group without answer is given up after VALUES_TIMEOUT and the next
+        one is requested; after MAX_UNANSWERED_GROUPS in a row the remaining
+        groups are not requested. Returns the values read.
         """
         result: dict[tuple[int, int], int] = {}
-        group_size = self.transport.max_values_per_request
+        unanswered = 0
         async with self._lock:
             self._value_queue = asyncio.Queue()
             try:
-                for start in range(0, len(keys), group_size):
-                    group = keys[start : start + group_size]
+                for number, group in enumerate(self._value_groups(keys), 1):
                     self._requested_keys.update(group)
                     try:
                         await self._async_send(
@@ -306,15 +313,30 @@ class EtaClient:
                         answered = await self._async_collect(set(group), result)
                     finally:
                         await self._async_send(build_frame(SERVICE_UNSUBSCRIBE))
-                    if not answered:
-                        _LOGGER.debug(
-                            "No values for group %d, not requesting more",
-                            start // group_size + 1,
-                        )
+                    if answered:
+                        unanswered = 0
+                        continue
+                    unanswered += 1
+                    _LOGGER.debug("No values for group %d", number)
+                    if unanswered >= MAX_UNANSWERED_GROUPS:
+                        _LOGGER.debug("Heater does not answer, not requesting more")
                         break
             finally:
                 self._value_queue = None
         return result
+
+    def _value_groups(self, keys: list[tuple[int, int]]) -> list[list[tuple[int, int]]]:
+        """Split the values into groups, each from one node, sorted by index.
+
+        Groups mixing the boiler board with another board (e.g. node 24 and
+        40) were answered less reliably over Zigbee.
+        """
+        size = self.transport.max_values_per_request
+        groups: list[list[tuple[int, int]]] = []
+        for _, node_keys in groupby(sorted(set(keys)), key=itemgetter(0)):
+            node_list = list(node_keys)
+            groups += [node_list[i : i + size] for i in range(0, len(node_list), size)]
+        return groups
 
     async def _async_collect(
         self, wanted: set[tuple[int, int]], result: dict[tuple[int, int], int]

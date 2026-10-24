@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from time import monotonic
 from unittest.mock import patch
 
 from homeassistant.components.button import DOMAIN as BUTTON_DOMAIN, SERVICE_PRESS
@@ -71,21 +72,35 @@ async def test_setup_ptvo(
 async def test_values_update(
     hass: HomeAssistant, heater: FakeHeater, serial_entry: MockConfigEntry
 ) -> None:
-    """Values update and become unavailable when the heater stops answering."""
+    """Missing values keep their last value for a while, then are unavailable."""
     await _setup(hass, serial_entry)
     coordinator = serial_entry.runtime_data
     flap = _entity_id(hass, serial_entry, 8, 3)
+    temp = _entity_id(hass, serial_entry, 8, 1)
+    now = monotonic()
 
     heater.values[(8, 3)] = 0
     del heater.values[(8, 1)]
-    await coordinator.async_refresh()
+    with patch("custom_components.eta_heater.coordinator.monotonic", return_value=now):
+        await coordinator.async_refresh()
     assert hass.states.get(flap).state == STATE_OFF
-    assert (
-        hass.states.get(_entity_id(hass, serial_entry, 8, 1)).state == STATE_UNAVAILABLE
-    )
+    # missed by this read: the last value is still shown
+    assert hass.states.get(temp).state == "65.2"
+
+    later = now + coordinator.value_max_age + 1
+    with patch(
+        "custom_components.eta_heater.coordinator.monotonic", return_value=later
+    ):
+        await coordinator.async_refresh()
+    assert hass.states.get(temp).state == STATE_UNAVAILABLE
+    assert hass.states.get(flap).state == STATE_OFF
 
     heater.respond = False
-    await coordinator.async_refresh()
+    much_later = later + coordinator.value_max_age + 1
+    with patch(
+        "custom_components.eta_heater.coordinator.monotonic", return_value=much_later
+    ):
+        await coordinator.async_refresh()
     assert hass.states.get(flap).state == STATE_UNAVAILABLE
 
 
@@ -368,18 +383,17 @@ async def test_no_value_reads_during_reread(
     assert hass.states.get(temp).state == "65.2"
 
 
-async def test_only_foreign_values_fail_update(
+async def test_only_foreign_values(
     hass: HomeAssistant, heater: FakeHeater, serial_entry: MockConfigEntry
 ) -> None:
-    """An update without any requested value marks the entities unavailable."""
+    """Values requested by another program are not taken and raise a notice."""
     await _setup(hass, serial_entry)
     heater.foreign_values = True
     heater.answer_values = False
+    heater.values[(8, 1)] = 700
     await serial_entry.runtime_data.async_refresh()
-    assert not serial_entry.runtime_data.last_update_success
-    assert (
-        hass.states.get(_entity_id(hass, serial_entry, 8, 1)).state == STATE_UNAVAILABLE
-    )
+    # the foreign value is not taken; the last own value is kept for now
+    assert hass.states.get(_entity_id(hass, serial_entry, 8, 1)).state == "65.2"
     issue_id = f"other_program_{serial_entry.entry_id}"
     assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id)
 

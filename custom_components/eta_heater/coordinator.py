@@ -32,6 +32,12 @@ type EtaConfigEntry = ConfigEntry[EtaCoordinator]
 type EtaData = dict[tuple[int, int], float | int]
 
 
+# A value missing in reads is shown with its last value for this many update
+# intervals, but at least VALUE_MIN_MAX_AGE seconds
+VALUE_MAX_AGE_INTERVALS = 3
+VALUE_MIN_MAX_AGE = 900
+
+
 def monitor_list_store(hass: HomeAssistant, entry_id: str) -> Store[dict]:
     """Return the store that caches the monitor list of an entry."""
     return Store(hass, STORAGE_VERSION, f"{DOMAIN}.{entry_id}")
@@ -87,6 +93,9 @@ class EtaCoordinator(DataUpdateCoordinator[EtaData]):
         self.list_levels: list[int] = []
         self.rereading = False
         self.last_read_duration: float | None = None
+        # When each value was last received, to keep showing it for a while
+        # when a read misses it
+        self._received_at: dict[tuple[int, int], float] = {}
         self._foreign_value_frames = 0
         self._store = monitor_list_store(hass, entry.entry_id)
 
@@ -270,8 +279,27 @@ class EtaCoordinator(DataUpdateCoordinator[EtaData]):
                 translation_placeholders={"error": str(err)},
             ) from err
         self._async_check_other_program()
-        data = {e.key: e.scale(raw[e.key]) for e in selected if e.key in raw}
+        now = monotonic()
+        received = {e.key: e.scale(raw[e.key]) for e in selected if e.key in raw}
+        for key in received:
+            self._received_at[key] = now
+        if received:
+            self.last_read_duration = now - start
+        # Over a flaky connection a read can miss some values; they are shown
+        # with their last value until they are older than value_max_age
+        keys = {e.key for e in selected}
+        data = {
+            key: value
+            for key, value in (self.data or {}).items()
+            if key in keys and now - self._received_at.get(key, 0) <= self.value_max_age
+        }
+        data.update(received)
         if not data:
             raise UpdateFailed(translation_domain=DOMAIN, translation_key="no_values")
-        self.last_read_duration = monotonic() - start
         return data
+
+    @property
+    def value_max_age(self) -> float:
+        """Return how long a value is shown after it was last received."""
+        interval = self.update_interval.total_seconds() if self.update_interval else 0
+        return max(VALUE_MAX_AGE_INTERVALS * interval, VALUE_MIN_MAX_AGE)

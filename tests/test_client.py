@@ -42,9 +42,20 @@ async def test_read_values_in_groups(heater: FakeHeater) -> None:
     keys = [(8, i) for i in range(1, 9)] + [(9, 300), (9, 999)]
     values = await client.async_read_values(keys)
     assert values == {key: heater.values[key] for key in keys if key in heater.values}
-    assert len(heater.requests_of("MC")) == 2
-    assert len(heater.requests_of("ME")) == 2
-    assert [f.service for f in heater.requests] == ["MC", "ME", "MC", "ME"]
+    # node 8: six and two values, node 9: its own group, sorted by index
+    groups = [
+        [
+            (f.payload[i], f.payload[i + 1] * 256 + f.payload[i + 2])
+            for i in range(1, len(f.payload), 3)
+        ]
+        for f in heater.requests_of("MC")
+    ]
+    assert groups == [
+        [(8, 1), (8, 2), (8, 3), (8, 4), (8, 5), (8, 6)],
+        [(8, 7), (8, 8)],
+        [(9, 300), (9, 999)],
+    ]
+    assert [f.service for f in heater.requests] == ["MC", "ME"] * 3
 
 
 async def test_no_response(heater: FakeHeater) -> None:
@@ -82,7 +93,7 @@ async def test_frame_gap(heater: FakeHeater) -> None:
 
 
 async def test_values_stop_without_answer(heater: FakeHeater) -> None:
-    """No further groups are requested when a group is not answered."""
+    """After two groups without answer no further groups are requested."""
     heater.answer_values = False
     client = EtaClient(PtvoMqttTransport(FakeMqttBackend(heater), TOPIC))
     await client.async_connect()
@@ -90,8 +101,18 @@ async def test_values_stop_without_answer(heater: FakeHeater) -> None:
     assert [f.service for f in heater.requests] == ["ME"]
     heater.requests.clear()
     heater.request_times.clear()
+    client.transport.max_values_per_request = 3  # type: ignore[misc]
     assert await client.async_read_values([(8, i) for i in range(1, 9)]) == {}
-    assert [f.service for f in heater.requests] == ["MC", "ME"]
+    assert [f.service for f in heater.requests] == ["MC", "ME", "MC", "ME"]
+
+
+async def test_values_lost_answer_continues(heater: FakeHeater) -> None:
+    """A group whose answer got lost does not stop the read."""
+    heater.lost_value_answers = {1}
+    client = EtaClient(FakeSerialTransport(heater))
+    client.transport.max_values_per_request = 3  # type: ignore[misc]
+    values = await client.async_read_values([(8, i) for i in range(1, 9)])
+    assert set(values) == {(8, i) for i in range(4, 9)}
 
 
 async def test_disconnect_unsubscribes(heater: FakeHeater) -> None:
@@ -125,7 +146,7 @@ async def test_foreign_values_ignored(heater: FakeHeater) -> None:
     keys = [(8, i) for i in range(1, 9)]
     client.transport.max_values_per_request = 4  # type: ignore[misc]
     assert await client.async_read_values(keys) == {}
-    assert [f.service for f in heater.requests] == ["MC", "ME"]
+    assert [f.service for f in heater.requests] == ["MC", "ME", "MC", "ME"]
 
 
 async def test_level_switch_quirk(heater: FakeHeater) -> None:
