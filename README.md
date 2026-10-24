@@ -163,7 +163,14 @@ The controller is easily overloaded, so the integration is strict:
   returns the next entry, whatever position it asks for. So entries are
   collected in the order they arrive instead of being matched to requests,
   and a lost answer only leaves a gap (three lost answers in a row stop the
-  read). Values: a group without answer stops the read of further groups.
+  read).
+- Values are requested in groups, each group from one board (node) and
+  sorted by index; mixed groups were answered less reliably. The heater
+  sends a group again every 15 seconds, so a lost answer gets further
+  chances within the 40 seconds the integration waits. After two groups
+  without answer in a row, the remaining groups are not requested.
+- A value missing in a read keeps its last value for three update
+  intervals (at least 15 minutes) before it becomes unavailable.
 - At least 0.5 seconds pass between two frames sent to the heater.
 - Every value subscription is stopped again (`ME`), also after errors, and
   before the monitor list is read.

@@ -98,6 +98,9 @@ class FakeHeater:
         self.values = dict(VALUES)
         self.respond = True
         self.answer_values = True
+        # Numbers (1, 2, ...) of value answers lost on the way
+        self.lost_value_answers: set[int] = set()
+        self._mc_answers = 0
         self.foreign_values = False
         # Like the real controller: the first request of another level is
         # answered with "end of list" first and the actual entry shortly after
@@ -183,6 +186,9 @@ class FakeHeater:
         self._send(build_frame("Mb", payload))
 
     def _answer_values(self, frame: Frame) -> None:
+        self._mc_answers += 1
+        if self._mc_answers in self.lost_value_answers:
+            return
         payload = b""
         for pos in range(1, len(frame.payload), 3):
             node, hb, lb = frame.payload[pos : pos + 3]
