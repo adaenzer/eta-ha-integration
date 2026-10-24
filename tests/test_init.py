@@ -20,7 +20,7 @@ from custom_components.eta_heater.const import CONF_LEVELS, CONF_PUBLISH_ERRORS,
 from custom_components.eta_heater.diagnostics import async_get_config_entry_diagnostics
 from custom_components.eta_heater.transport import Transport, TransportError
 
-from .fake_heater import INFO_DISPLAY, TOPIC, FakeHeater
+from .fake_heater import INFO_DISPLAY, TOPIC, FakeHeater, entry as fake_entry
 
 pytestmark = pytest.mark.usefixtures("transports")
 
@@ -71,7 +71,7 @@ async def test_setup_ptvo(
     assert temp.attributes["unit_of_measurement"] == "°C"
     assert temp.attributes["friendly_name"] == "ETA heater Kesseltemperatur"
     assert state(8, 4).state == "-1.0"
-    assert state(8, 2).state == "3"
+    assert state(8, 2).state == "heating"
     assert state(8, 3).state == STATE_ON
     assert state(8, 5).state == "7"
     assert state(8, 6).attributes["unit_of_measurement"] == "h"
@@ -606,3 +606,27 @@ async def test_acknowledge_button(hass: HomeAssistant, heater: FakeHeater) -> No
     await hass.async_block_till_done()
     assert heater.keys == [1]
     assert hass.states.get(sensor).attributes["line_3"] == "HACK.KES Bereit"
+
+
+async def test_status_values(
+    hass: HomeAssistant, heater: FakeHeater, serial_entry: MockConfigEntry
+) -> None:
+    """Known status numbers get a state, unknown ones keep their number."""
+    heater.monitor_list[0] += [
+        (fake_entry(24, 45, 16), "HACK.KES"),
+        (fake_entry(24, 81, 45), "PUFFER"),
+    ]
+    heater.values[(24, 45)] = 3
+    heater.values[(24, 81)] = 65531  # -5
+    await _setup(hass, serial_entry)
+    boiler = _entity_id(hass, serial_entry, 24, 45)
+    buffer = _entity_id(hass, serial_entry, 24, 81)
+    assert hass.states.get(boiler).state == "heating"
+    assert hass.states.get(buffer).state == "charging"
+
+    heater.values[(24, 45)] = 42
+    heater.values[(24, 81)] = 65535  # -1
+    await serial_entry.runtime_data.async_refresh()
+    await hass.async_block_till_done()
+    assert hass.states.get(boiler).state == "42"
+    assert hass.states.get(buffer).state == "-1"

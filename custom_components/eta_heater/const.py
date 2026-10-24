@@ -88,6 +88,8 @@ class ValueType:
     device_class: SensorDeviceClass | BinarySensorDeviceClass | None = None
     unit: str | None = None
     state_class: SensorStateClass | None = None
+    # Status values: number -> state key, unknown numbers are shown as is
+    states: dict[int, str] | None = None
 
 
 def _binary(
@@ -96,9 +98,32 @@ def _binary(
     return ValueType(Platform.BINARY_SENSOR, kind, device_class)
 
 
-def _status(kind: str) -> ValueType:
-    # The meaning of the numbers is unknown, so the raw value is shown
-    return ValueType(Platform.SENSOR, kind)
+def _status(kind: str, states: dict[int, str] | None = None) -> ValueType:
+    return ValueType(Platform.SENSOR, kind, states=states)
+
+
+# Found by comparing the values with the main screen of the controller. The
+# boiler states follow the order of the texts the panel uses, 0, 2-6 were
+# seen; the rest of that order is assumed. Buffer states do not follow such
+# an order, so only the ones seen are listed.
+BOILER_STATES: Final = {
+    0: "off",
+    1: "preheating",
+    2: "igniting",
+    3: "heating",
+    4: "ember_burnout",
+    5: "ready",
+    6: "deashing",
+    7: "blocked",
+    8: "external_heat",
+    9: "calibrating",
+    10: "fault",
+}
+BUFFER_STATES: Final = {
+    -5: "charging",
+    1: "charged",
+    2: "requesting",
+}
 
 
 def _measurement(
@@ -132,13 +157,13 @@ VALUE_TYPES: Final[dict[int, ValueType]] = {
     8: _binary("on_off"),
     13: _binary("on_off"),
     15: _binary("opening", BinarySensorDeviceClass.OPENING),
-    16: _status("boiler_state"),
+    16: _status("boiler_state", BOILER_STATES),
     17: _binary("on_off"),
     23: _status("drive_state"),
     30: _binary("on_off"),
     32: ValueType(Platform.SENSOR, "number"),
     37: _measurement("percentage", PERCENTAGE),
-    45: _status("hot_water_state"),
+    45: _status("hot_water_state", BUFFER_STATES),
     48: _hours(),
     65: _measurement(
         "current", UnitOfElectricCurrent.AMPERE, SensorDeviceClass.CURRENT
