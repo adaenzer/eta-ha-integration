@@ -19,6 +19,7 @@ from operator import itemgetter
 from time import monotonic
 
 from .protocol import (
+    KEY_YES,
     SERVICE_DISPLAY,
     SERVICE_MONITOR_LIST_ENTRY,
     SERVICE_STOP,
@@ -30,6 +31,7 @@ from .protocol import (
     MonitorEntry,
     build_frame,
     display_mirror_request,
+    key_request,
     monitor_list_request,
     parse_display,
     parse_display_tail,
@@ -83,6 +85,15 @@ class EtaError(Exception):
 
 class EtaTimeoutError(EtaError):
     """The heater did not answer in time."""
+
+
+class NothingToAcknowledgeError(EtaError):
+    """The display shows no message to acknowledge."""
+
+    def __init__(self, display: DisplayContent) -> None:
+        """Initialize the error with the display content."""
+        super().__init__(f"Nothing to acknowledge: {display.text}")
+        self.display = display
 
 
 class EtaClient:
@@ -212,7 +223,38 @@ class EtaClient:
             await self._async_send(sms_command_request(code))
 
     async def async_read_display(self) -> DisplayContent:
-        """Read the display: mirroring on, first complete frame, mirroring off.
+        """Read the display: mirroring on, first complete frame, mirroring off."""
+        async with self._lock:
+            self._display_queue = asyncio.Queue()
+            try:
+                return await self._async_mirror()
+            finally:
+                self._display_queue = None
+                await self._async_send(display_mirror_request(False))
+
+    async def async_acknowledge(self) -> tuple[DisplayContent, DisplayContent]:
+        """Press "Ja" if the display shows a message to acknowledge.
+
+        Reads the display first and raises NothingToAcknowledgeError if it
+        shows no error or info message, so the key is never pressed blindly.
+        Returns the display before and after the key press.
+        """
+        async with self._lock:
+            self._display_queue = asyncio.Queue()
+            try:
+                before = await self._async_mirror()
+                if not before.shows_message:
+                    raise NothingToAcknowledgeError(before)
+                _LOGGER.info("Acknowledging on the heater's display: %s", before.text)
+                self._drain_display()
+                await self._async_send(key_request(KEY_YES))
+                return before, await self._async_display_change(before)
+            finally:
+                self._display_queue = None
+                await self._async_send(display_mirror_request(False))
+
+    async def _async_mirror(self) -> DisplayContent:
+        """Get the display while holding the lock, with mirroring on.
 
         The controller sends the display right after mirroring is switched
         on. Over Zigbee a frame sometimes arrives without its beginning, so
@@ -220,23 +262,42 @@ class EtaClient:
         checksum) arrives. If only frame ends arrived, the last one is
         returned (complete=False): its flags are reliable, its text is not.
         """
-        async with self._lock:
-            self._display_queue = asyncio.Queue()
-            self._display_tail = None
+        assert self._display_queue is not None
+        self._display_tail = None
+        for _ in range(DISPLAY_ATTEMPTS):
+            await self._async_send(display_mirror_request(True))
             try:
-                for _ in range(DISPLAY_ATTEMPTS):
-                    await self._async_send(display_mirror_request(True))
-                    try:
-                        async with asyncio.timeout(DISPLAY_ATTEMPT_TIMEOUT):
-                            return await self._display_queue.get()
-                    except TimeoutError:
-                        _LOGGER.debug("No complete display frame, asking again")
-            finally:
-                self._display_queue = None
-                await self._async_send(display_mirror_request(False))
+                async with asyncio.timeout(DISPLAY_ATTEMPT_TIMEOUT):
+                    return await self._display_queue.get()
+            except TimeoutError:
+                _LOGGER.debug("No complete display frame, asking again")
         if self._display_tail is not None:
             return self._display_tail
         raise EtaTimeoutError("No display content from heater")
+
+    def _drain_display(self) -> None:
+        assert self._display_queue is not None
+        while not self._display_queue.empty():
+            self._display_queue.get_nowait()
+        self._display_tail = None
+
+    async def _async_display_change(self, before: DisplayContent) -> DisplayContent:
+        """Wait for the display to change after a key press."""
+        assert self._display_queue is not None
+        try:
+            async with asyncio.timeout(DISPLAY_ATTEMPT_TIMEOUT):
+                while True:
+                    after = await self._display_queue.get()
+                    if (
+                        after.lines[1:] != before.lines[1:]
+                        or after.flags != before.flags
+                    ):
+                        return after
+        except TimeoutError:
+            # The display sends changes by itself while mirroring is on;
+            # ask for the current content if none arrived
+            self._drain_display()
+            return await self._async_mirror()
 
     async def async_probe(self) -> None:
         """Check that the heater answers; raises EtaError if it does not."""

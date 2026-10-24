@@ -131,6 +131,9 @@
       },
       "read_display": {
         "name": "Read display"
+      },
+      "acknowledge": {
+        "name": "Acknowledge (Ja)"
       }
     },
     "event": {
@@ -209,9 +212,6 @@
           "flags": {
             "name": "Flags"
           },
-          "led_green": {
-            "name": "LED green (operation)"
-          },
           "led_red": {
             "name": "LED red (fault)"
           },
@@ -220,6 +220,9 @@
           },
           "complete": {
             "name": "Complete"
+          },
+          "boiler_key_light": {
+            "name": "Light of the Kessel key"
           }
         }
       }
@@ -260,6 +263,9 @@
     },
     "display_failed": {
       "message": "Reading the display failed: {error}"
+    },
+    "nothing_to_acknowledge": {
+      "message": "Nothing to acknowledge, the display shows: {display}"
     }
   },
   "issues": {

@@ -30,6 +30,9 @@
       },
       "read_display": {
         "default": "mdi:monitor-eye"
+      },
+      "acknowledge": {
+        "default": "mdi:check-circle-outline"
       }
     },
     "event": {

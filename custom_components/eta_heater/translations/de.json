@@ -131,6 +131,9 @@
       },
       "read_display": {
         "name": "Anzeige lesen"
+      },
+      "acknowledge": {
+        "name": "Quittieren (Ja)"
       }
     },
     "event": {
@@ -209,9 +212,6 @@
           "flags": {
             "name": "Flags"
           },
-          "led_green": {
-            "name": "LED grün (Betrieb)"
-          },
           "led_red": {
             "name": "LED rot (Störung)"
           },
@@ -220,6 +220,9 @@
           },
           "complete": {
             "name": "Vollständig"
+          },
+          "boiler_key_light": {
+            "name": "Licht Kessel-Taste"
           }
         }
       }
@@ -260,6 +263,9 @@
     },
     "display_failed": {
       "message": "Lesen der Anzeige fehlgeschlagen: {error}"
+    },
+    "nothing_to_acknowledge": {
+      "message": "Nichts zu quittieren, die Anzeige zeigt: {display}"
     }
   },
   "issues": {

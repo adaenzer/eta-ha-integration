@@ -20,7 +20,7 @@ from custom_components.eta_heater.const import CONF_LEVELS, CONF_PUBLISH_ERRORS,
 from custom_components.eta_heater.diagnostics import async_get_config_entry_diagnostics
 from custom_components.eta_heater.transport import Transport, TransportError
 
-from .fake_heater import TOPIC, FakeHeater
+from .fake_heater import INFO_DISPLAY, TOPIC, FakeHeater
 
 pytestmark = pytest.mark.usefixtures("transports")
 
@@ -566,7 +566,7 @@ async def test_read_display(
         == "20:29:59 | TEMPERATURANZEIGEN | HACK.KES Bereit | PUFFER Geladen"
     )
     assert state.attributes["line_3"] == "HACK.KES Bereit"
-    assert state.attributes["led_green"] is True
+    assert state.attributes["boiler_key_light"] is True
     assert state.attributes["led_red"] is False
     assert [f.payload for f in heater.requests_of("II")] == [b"1", b"0"]
     assert not heater.mirroring
@@ -577,3 +577,32 @@ async def test_read_display(
             BUTTON_DOMAIN, SERVICE_PRESS, {ATTR_ENTITY_ID: button}, blocking=True
         )
     assert heater.requests_of("II")[-1].payload == b"0"
+
+
+async def test_acknowledge_button(hass: HomeAssistant, heater: FakeHeater) -> None:
+    """The acknowledge button presses Ja only when a message is shown."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"connection": "serial", "device": "/dev/ttyUSB0", "baudrate": 19200},
+        options={"allow_commands": True},
+    )
+    await _setup(hass, entry)
+    registry = er.async_get(hass)
+    button = registry.async_get_entity_id(
+        "button", DOMAIN, f"{entry.entry_id}_acknowledge"
+    )
+    sensor = registry.async_get_entity_id("sensor", DOMAIN, f"{entry.entry_id}_display")
+
+    with pytest.raises(HomeAssistantError, match="TEMPERATURANZEIGEN"):
+        await hass.services.async_call(
+            BUTTON_DOMAIN, SERVICE_PRESS, {ATTR_ENTITY_ID: button}, blocking=True
+        )
+    assert heater.keys == []
+
+    heater.display = INFO_DISPLAY
+    await hass.services.async_call(
+        BUTTON_DOMAIN, SERVICE_PRESS, {ATTR_ENTITY_ID: button}, blocking=True
+    )
+    await hass.async_block_till_done()
+    assert heater.keys == [1]
+    assert hass.states.get(sensor).attributes["line_3"] == "HACK.KES Bereit"

@@ -8,6 +8,8 @@ import pytest
 
 from custom_components.eta_heater.const import strip_unit, unit_from_name
 from custom_components.eta_heater.protocol import (
+    KEY_YES,
+    DisplayContent,
     Frame,
     FrameParser,
     MonitorEntry,
@@ -15,6 +17,7 @@ from custom_components.eta_heater.protocol import (
     build_monitor_list,
     clean_display_text,
     display_mirror_request,
+    key_request,
     parse_display,
     parse_display_tail,
     parse_monitor_entry,
@@ -228,7 +231,7 @@ def test_parse_display() -> None:
         display.text
         == "Hackgutsteuerung 0 | INFO | Kessel wurde per | SMS EIN geschaltet"
     )
-    assert display.led_red and not display.led_green
+    assert display.led_red and not display.boiler_key_light
     assert parse_display(b"too short") is None
     assert display_mirror_request(True) == bytes.fromhex("7B 49 49 01 31 31 7D")
     assert display_mirror_request(False) == bytes.fromhex("7B 49 49 01 30 30 7D")
@@ -244,3 +247,19 @@ def test_parse_display_tail() -> None:
     assert tail.text == "… SMS EIN geschaltet"
     assert parse_display_tail(b"{MD\x05...") is None
     assert parse_display_tail(b"no flags here") is None
+
+
+def test_key_request_and_messages() -> None:
+    """Key frames are sent like ETA's display simulator; messages are recognized."""
+    assert key_request(KEY_YES) == bytes.fromhex("7B 49 54 01 31 01 7D")
+    lines = ("Austragung 0", "** FEHLER **", "Wartungsdeckel Fall-", "schacht offen!")
+    assert DisplayContent(lines, "000000000").shows_message
+    assert DisplayContent(("x", "INFO", "y", "z"), "000000000").shows_message
+    assert DisplayContent(("x", "[i]", "y", "z"), "000000000").shows_message
+    main = ("20:29:59", "TEMPERATURANZEIGEN", "HACK.KES Bereit", "PUFFER Geladen")
+    assert not DisplayContent(main, "000001000").shows_message
+    # red LED: a fault is pending, also when only the flags arrived
+    assert DisplayContent(("", "", "", "x"), "000000010", complete=False).shows_message
+    assert not DisplayContent(
+        ("", "", "", "INFO"), "000000000", complete=False
+    ).shows_message

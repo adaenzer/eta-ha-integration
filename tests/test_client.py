@@ -9,7 +9,11 @@ from unittest.mock import patch
 import pytest
 
 from custom_components.eta_heater import client as client_module
-from custom_components.eta_heater.client import EtaClient, EtaTimeoutError
+from custom_components.eta_heater.client import (
+    EtaClient,
+    EtaTimeoutError,
+    NothingToAcknowledgeError,
+)
 from custom_components.eta_heater.protocol import (
     Frame,
     build_monitor_list,
@@ -17,7 +21,14 @@ from custom_components.eta_heater.protocol import (
 )
 from custom_components.eta_heater.transport import PtvoMqttTransport
 
-from .fake_heater import TOPIC, FakeHeater, FakeMqttBackend, FakeSerialTransport
+from .fake_heater import (
+    ERROR_DISPLAY,
+    INFO_DISPLAY,
+    TOPIC,
+    FakeHeater,
+    FakeMqttBackend,
+    FakeSerialTransport,
+)
 
 
 async def test_read_monitor_list(heater: FakeHeater) -> None:
@@ -228,10 +239,39 @@ async def test_display_tail_as_fallback(heater: FakeHeater) -> None:
     display = await client.async_read_display()
     assert not display.complete
     assert display.flags == "000001000"
-    assert display.led_green
+    assert display.boiler_key_light
     assert display.text == "… UFFER Geladen"  # the beginning got lost
     assert heater.requests_of("II")[-1].payload == b"0"
 
     heater.respond = False
     with pytest.raises(EtaTimeoutError):
         await client.async_read_display()
+
+
+@pytest.mark.parametrize("display", [INFO_DISPLAY, ERROR_DISPLAY])
+async def test_acknowledge(heater: FakeHeater, display: str) -> None:
+    """Ja is pressed only after the display showed a message."""
+    heater.display = display
+    client = EtaClient(FakeSerialTransport(heater))
+    before, after = await client.async_acknowledge()
+    assert before.shows_message
+    assert heater.keys == [1]
+    assert after.lines[2] == "HACK.KES Bereit"
+    assert heater.requests_of("II")[-1].payload == b"0"
+
+
+async def test_nothing_to_acknowledge(heater: FakeHeater) -> None:
+    """Without a message on the display no key is pressed."""
+    client = EtaClient(FakeSerialTransport(heater))
+    with pytest.raises(NothingToAcknowledgeError) as err:
+        await client.async_acknowledge()
+    assert err.value.display.lines[1] == "TEMPERATURANZEIGEN"
+    assert heater.keys == []
+    assert heater.requests_of("II")[-1].payload == b"0"
+
+    # Only the end of a frame without red LED: the screen is not known
+    heater.display = INFO_DISPLAY
+    heater.display_lost = 10
+    with pytest.raises(NothingToAcknowledgeError):
+        await client.async_acknowledge()
+    assert heater.keys == []

@@ -14,7 +14,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 import homeassistant.util.dt as dt_util
 
-from .client import EtaClient, EtaError
+from .client import EtaClient, EtaError, NothingToAcknowledgeError
 from .const import (
     CONF_LEVELS,
     DEFAULT_LEVELS,
@@ -240,10 +240,24 @@ class EtaCoordinator(DataUpdateCoordinator[EtaData]):
 
     async def async_read_display(self) -> DisplayContent:
         """Read the display content and let the display sensor show it."""
-        self.display = await self.client.async_read_display()
+        self._async_show_display(await self.client.async_read_display())
+        assert self.display is not None
+        return self.display
+
+    async def async_acknowledge(self) -> DisplayContent:
+        """Acknowledge a message on the display; show the display afterwards."""
+        try:
+            _, after = await self.client.async_acknowledge()
+        except NothingToAcknowledgeError as err:
+            self._async_show_display(err.display)
+            raise
+        self._async_show_display(after)
+        return after
+
+    def _async_show_display(self, display: DisplayContent) -> None:
+        self.display = display
         self.display_read_at = dt_util.utcnow()
         self.async_update_listeners()
-        return self.display
 
     def enabled_by_default(self, monitor_entry: MonitorEntry) -> bool:
         """Return True if a value's entity is enabled when it is first created.

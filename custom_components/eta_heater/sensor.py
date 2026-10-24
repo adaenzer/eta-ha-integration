@@ -103,7 +103,7 @@ class EtaDisplaySensor(CoordinatorEntity[EtaCoordinator], SensorEntity):
             "line_4",
             "complete",
             "flags",
-            "led_green",
+            "boiler_key_light",
             "led_red",
         }
     )
@@ -136,7 +136,7 @@ class EtaDisplaySensor(CoordinatorEntity[EtaCoordinator], SensorEntity):
         attributes |= {
             "complete": display.complete,
             "flags": display.flags,
-            "led_green": display.led_green,
+            "boiler_key_light": display.boiler_key_light,
             "led_red": display.led_red,
             "read_at": self.coordinator.display_read_at,
         }

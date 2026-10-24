@@ -129,7 +129,9 @@ The button **Read display** switches the controller's display mirroring on
 (service `II`, as ETA's display simulator does), takes the first complete
 display frame (`IE`) and switches mirroring off again. The sensor **Display**
 then shows the four lines joined with " | ", with the single lines, the 9
-status flags and the LEDs (green: operation, red: fault) as attributes. After
+status flags, the light of the "Kessel" key and the red fault LED as
+attributes. The key light follows the key, not the boiler: after switching
+the boiler on remotely it stays off although the boiler works. After
 each command the display is read automatically a few seconds later. Over a
 flaky Zigbee link a display frame sometimes arrives without its beginning;
 mirroring is then requested again (up to four times). If only frame ends

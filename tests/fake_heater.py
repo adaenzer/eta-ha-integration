@@ -12,6 +12,30 @@ from custom_components.eta_heater.transport import Transport, TransportError
 
 TOPIC = "zigbee2mqtt/heater"
 
+# Display frames as the controller sends them: 4 lines of 20 characters and
+# 9 flags (position 6: green LED, position 8: red LED)
+MAIN_DISPLAY = (
+    f"{'20:29:59':>19} "
+    f"{'TEMPERATURANZEIGEN':<19}\xb3"
+    f"{'HACK.KES     Bereit':<20}"
+    f"{'PUFFER      Geladen':<20}"
+    "000001000"
+)
+INFO_DISPLAY = (
+    f"{'Hackgutsteuerung 0':<20}"
+    f"{'INFO':^20}"
+    f"{'\xa0Kessel wurde per':<20}"
+    f"{' SMS EIN geschaltet':<20}"
+    "000000000"
+)
+ERROR_DISPLAY = (
+    f"{'Austragung 0':<20}"
+    f"{'** FEHLER **':^20}"
+    f"{'Wartungsdeckel Fall-':<20}"
+    f"{'schacht offen!':<20}"
+    "000000010"
+)
+
 
 def entry(node: int, index: int, value_type: int, divider: int = 1) -> tuple[int, ...]:
     """Return monitor list header bytes."""
@@ -106,13 +130,8 @@ class FakeHeater:
         # Display frames of which only the end arrives
         self.display_lost = 0
         # 4 lines of 20 characters and 9 flags, as the controller sends them
-        self.display = (
-            f"{'20:29:59':>19} "
-            f"{'TEMPERATURANZEIGEN':<19}\xb3"
-            f"{'HACK.KES     Bereit':<20}"
-            f"{'PUFFER      Geladen':<20}"
-            "000001000"
-        )
+        self.display = MAIN_DISPLAY
+        self.keys: list[int] = []
         # Like the real controller: the first request of another level is
         # answered with "end of list" first and the actual entry shortly after
         self.level_switch_quirk = True
@@ -132,6 +151,14 @@ class FakeHeater:
 
     def receive(self, data: bytes) -> None:
         """Receive bytes sent to the heater."""
+        if data.startswith(b"{IT"):
+            # Key frames do not carry the usual checksum
+            self.keys.append(data[5])
+            if data[5] == 1 and self.display != MAIN_DISPLAY:
+                self.display = MAIN_DISPLAY
+                if self.mirroring:
+                    self._send(build_frame("IE", self.display.encode("latin-1")))
+            return
         self._parser.feed(data)
 
     def requests_of(self, service: str) -> list[Frame]:

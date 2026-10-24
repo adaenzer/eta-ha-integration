@@ -349,6 +349,25 @@ def parse_values(payload: bytes) -> dict[tuple[int, int], int] | None:
     return values
 
 
+# Keys of the operating panel, as sent by ETA's display simulator
+KEY_CHANGE = 0
+KEY_YES = 1
+KEY_UP = 2
+KEY_DOWN = 3
+KEY_BACK = 4
+KEY_INFO = 5
+
+
+def key_request(key: int) -> bytes:
+    """Build a key press of the operating panel (service IT).
+
+    Sent exactly as ETA's display simulator does; the byte after the length
+    is not the usual checksum, but the controller accepts it (tested with the
+    Info and Ja keys).
+    """
+    return b"{IT\x01\x31" + bytes([key]) + b"}"
+
+
 def display_mirror_request(on: bool) -> bytes:
     """Build the request to switch display mirroring on or off."""
     return build_frame(SERVICE_DISPLAY_MIRROR, b"1" if on else b"0")
@@ -359,15 +378,32 @@ class DisplayContent:
     """The content of the heater's display (an IE frame)."""
 
     lines: tuple[str, ...]
-    # One character per flag; found by testing: position 6 is the green LED
-    # (operation), position 8 the red LED (fault)
+    # One character per flag; found by testing: position 6 is the light of
+    # the "Kessel" key (off when the boiler was switched on remotely),
+    # position 8 the red LED (fault)
     flags: str
     # False if only the end of a display frame arrived (see parse_display_tail)
     complete: bool = True
 
     @property
-    def led_green(self) -> bool:
-        """Return True if the green LED (operation) is on."""
+    def shows_message(self) -> bool:
+        """Return True if an error or info message waits to be acknowledged.
+
+        Error messages show "** FEHLER **", info messages "INFO" alternating
+        with a blinking "[i]"; the red LED is on while a fault is pending.
+        Only a complete display can show the text.
+        """
+        if self.led_red:
+            return True
+        return self.complete and bool(_MESSAGE.search(" ".join(self.lines)))
+
+    @property
+    def boiler_key_light(self) -> bool:
+        """Return True if the light of the "Kessel" (on/off) key is on.
+
+        It follows the key, not the boiler: after switching the boiler on
+        remotely the light stays off although the boiler works.
+        """
         return self.flags[5:6] == "1"
 
     @property
@@ -402,6 +438,7 @@ def parse_display(payload: bytes) -> DisplayContent | None:
     return DisplayContent(lines, text[size : size + DISPLAY_FLAGS])
 
 
+_MESSAGE = re.compile(r"\bFEHLER\b|\bINFO\b|\[i\]")
 _DISPLAY_TAIL = re.compile(rb"([\x20-\xff]*?)([01]{9})\}?$")
 
 

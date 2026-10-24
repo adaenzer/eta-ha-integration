@@ -11,7 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .client import EtaError
+from .client import EtaError, NothingToAcknowledgeError
 from .const import CONF_ALLOW_COMMANDS, DOMAIN, HEATER_COMMANDS, HeaterCommand
 from .coordinator import EtaConfigEntry
 from .entity import device_info
@@ -37,6 +37,7 @@ async def async_setup_entry(
     ]
     if entry.options.get(CONF_ALLOW_COMMANDS, False):
         buttons += [EtaCommandButton(entry, command) for command in HEATER_COMMANDS]
+        buttons.append(EtaAcknowledgeButton(entry))
     async_add_entities(buttons)
 
 
@@ -112,6 +113,43 @@ class EtaCommandButton(ButtonEntity):
             await coordinator.async_read_display()
         except (EtaError, TransportError) as err:
             _LOGGER.debug("Could not read the display after the command: %s", err)
+        await coordinator.async_request_refresh()
+
+
+class EtaAcknowledgeButton(ButtonEntity):
+    """Press "Ja" on the panel, but only if a message waits on the display."""
+
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+    _attr_translation_key = "acknowledge"
+
+    def __init__(self, entry: EtaConfigEntry) -> None:
+        """Initialize the button."""
+        self._entry = entry
+        self._attr_unique_id = f"{entry.entry_id}_acknowledge"
+        self._attr_device_info = device_info(entry)
+
+    async def async_press(self) -> None:
+        """Read the display, press Ja if it shows a message, read it again."""
+        coordinator = self._entry.runtime_data
+        if coordinator.rereading:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="busy_reading_list"
+            )
+        try:
+            await coordinator.async_acknowledge()
+        except NothingToAcknowledgeError as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="nothing_to_acknowledge",
+                translation_placeholders={"display": err.display.text},
+            ) from err
+        except (EtaError, TransportError) as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="display_failed",
+                translation_placeholders={"error": str(err)},
+            ) from err
         await coordinator.async_request_refresh()
 
 
